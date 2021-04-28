@@ -5,7 +5,7 @@ mpl.use('Agg')
 import random
 import sys, os, glob
 
-import Configuration as CF
+import Configuration_LFDEM as CF
 import Pebbles as PB
 import Hessian as HS
 import Analysis as AN

@@ -8,7 +8,7 @@
 # - Diagnostic plotting functions (see Analysis for publication-ready plotting)
 # - Analysis function to decompose modes, called from Analysis class
 
-from Configuration import *
+from Configuration_LFDEM import *
 
 # Here lives the diagonalisation algorithm
 from numpy import linalg as LA

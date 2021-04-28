@@ -17,7 +17,7 @@ import sys, os, glob
 
 # Each analysis has a Configuration, a Pebbles and a Hessian
 # (of which Pebbles and Hessian are allowed to be empty shells if you're not using these functions)
-from Configuration import *
+from Configuration_LFDEM import *
 from Pebbles import *
 from Hessian import *
 

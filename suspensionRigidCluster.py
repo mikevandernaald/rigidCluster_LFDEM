@@ -2,11 +2,11 @@ import numpy as np
 import sys
 import os
 from matplotlib import pyplot
-#sys.path.append('/home/mrv/pebbleCode/RigidLibrary-master/') #uncomment this line if you're on the cluster as this path is where the next four imports are located
 import Configuration_LFDEM as CF #Mike:  I modified the Configuration class so we don't have to load in using text files.
 import Pebbles as PB
 import Hessian as HS
 import Analysis as AN
+import itertools
 '''
 Date:  2/5/2021
 Authors:  Kenan Tang, Toka Eid, Mike van der Naald
@@ -17,11 +17,12 @@ Link to LF_DEM Github:
 
 Link to Silke's Rigid Cluster Github:
 
+To run on the cluster just use the following code to point the Python interpreter to where you keep this code:
+import sys
+sys.path.append('/home/mrv/pebbleCode/rigidCluster_LFDEM')
+
 '''
 
-#intFile = r"/project2/jaeger/abhinendra/kenan_data/N_1024/mu_1/VF0.8/int_D2N1024VF0.8Bidi1.4_0.5Square_1_pardata_phi0.8_stress100cl.dat"
-#dataFile = r"/project2/jaeger/abhinendra/kenan_data/N_1024/mu_1/VF0.8/data_D2N1024VF0.8Bidi1.4_0.5Square_1_pardata_phi0.8_stress100cl.dat"
-#parFile = r"/project2/jaeger/abhinendra/kenan_data/N_1024/mu_1/VF0.8/par_D2N1024VF0.8Bidi1.4_0.5Square_1_pardata_phi0.8_stress100cl.dat"
 
 def pebbleGame_LFDEMSnapshot(dataFile,parFile,intFile,outputDir=False,snapShotRange=False):
     """
@@ -42,7 +43,8 @@ def pebbleGame_LFDEMSnapshot(dataFile,parFile,intFile,outputDir=False,snapShotRa
     with open(intFile) as fp:
         for i, line in enumerate(fp):
             if i==1:
-                numParticles=int(line[1:]) #This skips the first five characters in the line since they're always "# np "
+                res = [int(i) for i in line.split() if i.isdigit()]
+                numParticles=res[0] #This skips the first five characters in the line since they're always "# np "
             if i==3:
                 systemSize = float(line[5:]) #This skips the first five characters in the line since they're always "# Lx "
 
@@ -101,12 +103,12 @@ def pebbleGame_LFDEMSnapshot(dataFile,parFile,intFile,outputDir=False,snapShotRa
     #We will also be ignoring any interaction where the contact type is 0 as that is a hydrodynamic interaction.
     counter = 0
     for i in range(lowerSnapShotRange,upperSnapShotRange):
-        if i==numSnapshots:
+        if i==numSnapshots-1:
             #If there is a 0 in the third column then that means the particles are not in contact and we can throw that row our.
-            currentContacts = np.genfromtxt(islice(fileLines, int(linesWhereDataStarts[i]), int(numLines)),usecols=(0, 1, 2))
+            currentContacts = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(numLines)),usecols=(0, 1, 2))
             contactInfo[counter] = currentContacts[np.where(currentContacts[:, 2] != 0), :]
         else:
-            currentContacts = np.genfromtxt(islice(fileLines, int(linesWhereDataStarts[i]), int(linesWhereDataStarts[i + 1])),usecols=(0,1,2))
+            currentContacts = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(linesWhereDataStarts[i + 1])),usecols=(0,1,2))
             contactInfo[counter] = currentContacts[np.where(currentContacts[:, 2] != 0), :]
         del currentContacts
         counter=counter+1
