@@ -24,13 +24,12 @@ sys.path.append('/home/mrv/pebbleCode/rigidCluster_LFDEM')
 '''
 
 
-def pebbleGame_LFDEMSnapshot(dataFile,parFile,intFile,outputDir=False,snapShotRange=False):
+def pebbleGame_LFDEMSnapshot(parFile,intFile,outputDir=False,snapShotRange=False):
     """
     This program takes in the path to the data_, int_, and par_ files from LF_DEM simulation output and then feeds them
     into a code that identifies rigid cluster statistics from each snapshot in the simulation.  These statistics are then
     outputted into a textfile in outputDir and are also returned as a list via the function call return.  If you only
     want to process some of the snapshots you can put that in the variable snapShotRange.
-    :param dataFile: This is path to the data_ file outputted from the LF_DEM simulations.
     :param parFile:  This is path to the int_ file outputted from the LF_DEM simulations.
     :param intFile:  This is path to the par_ file outputted from the LF_DEM simulations.
     :param outputDir:  This is the directory where a textfile is outputted with the cluster statistics for each snapshot.
@@ -48,8 +47,6 @@ def pebbleGame_LFDEMSnapshot(dataFile,parFile,intFile,outputDir=False,snapShotRa
             if i==3:
                 systemSize = float(line[5:]) #This skips the first five characters in the line since they're always "# Lx "
 
-    #Now we need to get the strain rate for each snapshot.  These are stored as the third colum in the dataFile.
-    strainRates = np.loadtxt(dataFile,usecols=[2])
 
     #Load in the particles radii's (second column), the x positions (third column), and z positions (fifth column).
     positionData = np.loadtxt(parFile,usecols=[1,2,4])
@@ -106,10 +103,10 @@ def pebbleGame_LFDEMSnapshot(dataFile,parFile,intFile,outputDir=False,snapShotRa
         if i==numSnapshots-1:
             #If there is a 0 in the third column then that means the particles are not in contact and we can throw that row our.
             currentContacts = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(numLines)),usecols=(0, 1, 2))
-            contactInfo[counter] = currentContacts[np.where(currentContacts[:, 2] != 0), :]
+            contactInfo[counter] = currentContacts[np.where(currentContacts[:, 2] > 1), :]
         else:
             currentContacts = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(linesWhereDataStarts[i + 1])),usecols=(0,1,2))
-            contactInfo[counter] = currentContacts[np.where(currentContacts[:, 2] != 0), :]
+            contactInfo[counter] = currentContacts[np.where(currentContacts[:, 2] > 1), :]
         del currentContacts
         counter=counter+1
 
@@ -126,7 +123,7 @@ def pebbleGame_LFDEMSnapshot(dataFile,parFile,intFile,outputDir=False,snapShotRa
     for i in range(lowerSnapShotRange,upperSnapShotRange):
 
         currentContactData = contactInfo[counter]
-        ThisConf = CF.Configuration(numParticles,systemSize,strainRates[i],particleRadii)
+        ThisConf = CF.Configuration(numParticles,systemSize,particleRadii)
         ThisConf.readSimdata(positionData[:,:,i],currentContactData[0,:,:],i)
         ThisPebble = PB.Pebbles(ThisConf, 3, 3, 'nothing', False)
         ThisPebble.play_game()

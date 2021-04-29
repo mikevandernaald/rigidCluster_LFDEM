@@ -44,10 +44,10 @@ class Configuration:
 
     #======= Simulation parameter read-in =====================
     # use Parameter read-in as function called by the constructor
-    def getParameters(self,numParticles,systemSize,strainRate,radii):
+    def getParameters(self,numParticles,systemSize,radii):
         self.N = numParticles
         self.L = systemSize
-        self.gammadot = strainRate
+        self.gammadot = 0
         self.Lx = self.L
         self.Ly = self.L
         self.rad = radii
