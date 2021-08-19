@@ -1,7 +1,7 @@
 # rigidCluster_LFDEM
 
 Date: 4/21/2021
-Authors:  Mike van der Naald, Toka Eid, Kenan Tang
+Authors:  Mike van der Naald
 
 This is a collection of code that is written to adapt code that Silke Henkes wrote that can calculate rigid clusters in contact networks: 
 
