@@ -28,7 +28,7 @@ class Configuration:
                  radii
                  ):
         self.addBoundary = False
-        self.getParameters(numParticles,systemSize,strainRate,radii)
+        self.getParameters(numParticles,systemSize,radii)
         # Simulation data has periodic boundary conditions and also angles as output
         self.periodic = True
         self.hasAngles = True
