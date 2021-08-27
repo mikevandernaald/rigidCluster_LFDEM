@@ -7,6 +7,7 @@ import Pebbles as PB
 import Hessian as HS
 import Analysis as AN
 import itertools
+import re
 """
 Date:  2/5/2021
 Authors: Mike van der Naald
@@ -159,3 +160,84 @@ def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False):
 
     return clusterHolder
 
+
+
+def rigFileGenerator(topDir,outputDir):
+    """
+    This finds all par and int files in a directory and spits out their rigidcluster statistics
+    into a rig_ file
+    """
+    
+    
+    parFiles = []
+    intFiles = []
+    
+
+    for file in os.listdir(topDir):
+        if "int_" in file:
+            intFiles.append(file)
+        if "par_" in file:
+            parFiles.append(file)
+            
+            
+    for currentFile in parFiles:
+        result = re.search('_stress(.*)cl', currentFile)
+        currentStress = result.group(1)
+        
+        
+        
+        correspondingIntFile = [i for i in intFiles if '_stress'+currentStress+'cl' in i]
+        
+        currentIntFile = os.path.join(topDir,correspondingIntFile[0])
+        currentParFile = os.path.join(topDir,currentFile)
+        
+        
+        currentClusterInfo = pebbleGame_LFDEMSnapshot(currentParFile,currentIntFile)
+        
+        
+        result = re.search('par_(.*).dat', currentFile)
+        currentFileName = result.group(1)
+        
+        rigidClusterFileName = os.path.join(topDir,"rig_"+currentFileName+".dat")
+        
+        with open(rigidClusterFileName, 'w') as fp:
+            fp.write('#Rigid Cluster Sizes \n')
+            
+            for i in range(0,len(currentClusterInfo)):
+                
+                currentSnapShot = currentClusterInfo[i]
+                
+                if currentSnapShot==[0]:
+                    fp.write(str(0)+'\n')
+                else:
+                    for j in currentSnapShot[0]:
+                        fp.write(str(j)+'\t')
+                    fp.write('\n')
+                    
+            fp.write('\n')
+            fp.write('\n')
+            fp.write('#Rigid Cluster Bond Numbers\n')
+            fp.close()
+            
+            with open(rigidClusterFileName, 'a') as fp:
+                
+                for i in range(0,len(currentClusterInfo)):
+                    
+                    currentSnapShot = currentClusterInfo[i]
+                    
+                    if currentSnapShot==[0]:
+                        fp.write(str(0)+'\n')
+                    else:
+                        for j in currentSnapShot[0]:
+                            fp.write(str(j)+'\t')
+                        fp.write('\n')
+            
+            fp.close()
+            
+            
+    
+    
+    
+    
+    
+    
