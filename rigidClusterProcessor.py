@@ -25,7 +25,7 @@ sys.path.append('/home/mrv/pebbleCode/rigidCluster_LFDEM')
 
 
 
-def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False):
+def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False,returnPebbleIDandObj = True):
     """
     This program takes in the path to the data_, int_, and par_ files from LF_DEM simulation output and then feeds them
     into a code that identifies rigid cluster statistics from each snapshot in the simulation.  These statistics are then
@@ -150,19 +150,60 @@ def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False):
             ThisConf.readSimdata(positionData[:,:,counter],currentContactData,i)
             ThisPebble = PB.Pebbles(ThisConf, 3, 3, 'nothing', False)
             ThisPebble.play_game()
-            
-            _, clusterall, clusterallBonds, _, _ = ThisPebble.rigid_cluster()
-            if clusterall==[]:
+            ThisPebble.rigid_cluster()
+            if returnPebbleIDandObj == False:
+                clusterSizes,numBondsPerCluster = rigidClusterDataGenerator(ThisPebble,False)
+            else:
+                clusterSizes,numBondsPerCluster,clusterID = rigidClusterDataGenerator(ThisPebble)
+            if np.sum(clusterSizes)==0:
                 clusterHolder[counter]=[0]
             else:
-                clusterHolder[counter] = [ clusterall, clusterallBonds,ThisPebble,ThisConf]
+                if returnPebbleIDandObj == True:
+                    clusterHolder[counter] = [ clusterSizes, numBondsPerCluster,clusterID,ThisPebble]
+                else:
+                    clusterHolder[counter] = [ clusterSizes, numBondsPerCluster]
         counter=counter+1
-
     return clusterHolder
 
+def rigidClusterDataGenerator(pebbleObj,returnClusterIDs=True):
+    
+        #Load in all the relevant data.  The first column has the ID of the cluster and the second and third rows tell you the particles i and j which are in that cluster ID
+        clusterIDHolder = np.transpose(np.vstack([pebbleObj.cluster,pebbleObj.Ifull,pebbleObj.Jfull]))
+        
+        
+        #Remove all rows that have -1 in the first column.  Those are contacts that are not participating in a cluster
+        clusterIDHolder = clusterIDHolder[clusterIDHolder[:,0] != -1]
+        
+        numClusters = len(np.unique(clusterIDHolder[:,0]))
+        
+        clusterSizes = np.zeros(numClusters)
+        numBondsPerCluster = np.zeros(numClusters)
+        if returnClusterIDs == True:
+            clusterID = [0]*numClusters
+        
+        for i in range(0,numClusters):
+            currentCluster = clusterIDHolder[clusterIDHolder[:,0]==i][:,1:]
+            
+            currentCluster = np.unique(np.sort(currentCluster,axis=1), axis=0)
+        
+            (numBonds,_) = np.shape(currentCluster)
+            
+            
+            numBondsPerCluster[i] = numBonds
+            clusterSizes[i] = len(np.unique(currentCluster.flatten()))
+            if returnClusterIDs == True:
+                clusterID[i] = currentCluster
+            
+        if returnClusterIDs == True:
+            return clusterSizes,numBondsPerCluster,clusterID
+        else:
+            clusterSizes,numBondsPerCluster
+
+    
 
 
-def rigFileGenerator(topDir,outputDir):
+
+def rigFileGenerator(topDir,outputDir,snapShotRange=False):
     """
     This finds all par and int files in a directory and spits out their rigidcluster statistics
     into a rig_ file
@@ -192,7 +233,7 @@ def rigFileGenerator(topDir,outputDir):
         currentParFile = os.path.join(topDir,currentFile)
         
         
-        currentClusterInfo = pebbleGame_LFDEMSnapshot(currentParFile,currentIntFile)
+        currentClusterInfo = pebbleGame_LFDEMSnapshot(currentParFile,currentIntFile,snapShotRange)
         
         
         result = re.search('par_(.*).dat', currentFile)
@@ -211,30 +252,121 @@ def rigFileGenerator(topDir,outputDir):
                     fp.write(str(0)+'\n')
                 else:
                     for j in currentSnapShot[0]:
-                        fp.write(str(j)+'\t')
+                        fp.write(str(int(j))+'\t')
                     fp.write('\n')
                     
             fp.write('\n')
-            fp.write('\n')
             fp.write('#Rigid Cluster Bond Numbers\n')
-            fp.close()
+        fp.close()
+
             
-            with open(rigidClusterFileName, 'a') as fp:
+        with open(rigidClusterFileName, 'a') as fp:
+            
+            for i in range(0,len(currentClusterInfo)):
                 
-                for i in range(0,len(currentClusterInfo)):
+                currentSnapShot = currentClusterInfo[i]
+                
+                if currentSnapShot==[0]:
+                    fp.write(str(0)+'\n')
+                else:
+                    for j in currentSnapShot[1]:
+                        fp.write(str(int(j))+'\t')
+                    fp.write('\n')
+            fp.write('\n')
+            fp.write('#Rigid Cluster IDs \n')
+        fp.close()
                     
-                    currentSnapShot = currentClusterInfo[i]
+        with open(rigidClusterFileName, 'a') as fp:
+            
+            for i in range(0,len(currentClusterInfo)):
+                
+                fp.write('#snapShot = '+str(i)+'\n')
+                
+                currentSnapShot = currentClusterInfo[i]
+                
+                if currentSnapShot==[0]:
+                    fp.write(str(0)+'\n')
+                else:
+                    numClusters = len(currentSnapShot[0])
                     
-                    if currentSnapShot==[0]:
-                        fp.write(str(0)+'\n')
-                    else:
-                        for j in currentSnapShot[0]:
-                            fp.write(str(j)+'\t')
-                        fp.write('\n')
+                    for k in range(0,numClusters):
+                        currentTuplesToSave = currentSnapShot[2][k].flatten()
+                        for j in range(0,len(currentTuplesToSave)):
+                            if j==len(currentTuplesToSave)-1:
+                                fp.write(str(int(currentTuplesToSave[j]))+"\n")
+                            else:
+                                fp.write(str(int(currentTuplesToSave[j]))+",")
+                            
             
-            fp.close()
+            
+        fp.close()
             
             
+    
+def rigFileReader(rigFile,snapShotRange=False):
+    
+    
+    with open(rigFile, "r") as f1:   
+        fileLines = f1.readlines()
+        
+    indexOfDataSplit = fileLines.index('#Rigid Cluster Bond Numbers\n')
+    numSnapshots = indexOfDataSplit-3
+
+    
+    
+    #If the optional variable snapShotRange is not set then process all snapshots.  Otherwise set the correct range.
+    if snapShotRange == False:
+        lowerSnapShotRange = 0
+        upperSnapShotRange = numSnapshots
+    else:
+        lowerSnapShotRange = snapShotRange[0]
+        upperSnapShotRange = snapShotRange[1]
+    
+    
+    rigidClusterSizes = [0]*(upperSnapShotRange-lowerSnapShotRange)
+    numBonds = [0]*(upperSnapShotRange-lowerSnapShotRange)
+    
+    counter=0
+    for i in range(lowerSnapShotRange,upperSnapShotRange):
+        
+        rigidClusterSizes[counter] = np.fromstring(fileLines[i+1].replace('\t',' ').replace(',', '').replace('\n',''),sep=' ')
+        numBonds[counter] = np.fromstring(fileLines[i+1+indexOfDataSplit].replace('\t',' ').replace(',', '').replace('\n',''),sep=' ')
+        counter=counter+1
+        
+        
+    return rigidClusterSizes,numBonds
+    
+
+def rigIDExtractor(pebbleObj):
+    
+    #Load in all the relevant data.  The first column has the ID of the cluster and the second and third rows tell you the particles i and j which are in that cluster ID
+    clusterIDHolder = np.transpose(np.vstack([pebbleObj.cluster,pebbleObj.Ifull,pebbleObj.Jfull]))
+    
+    #Remove all rows that have -1 in the first column.  Those are contacts that are not participating in a cluster
+    clusterIDHolder = clusterIDHolder[clusterIDHolder[:,0] != -1]
+    
+    numClusters = len(np.unique(clusterIDHolder[:,0]))
+    
+    for i in range(0,numClusters):
+        
+        with open(rigidClusterFileName, 'w') as fp:
+            
+            currentTuplesToSave = clusterIDHolder[clusterIDHolder[:,0]==i][:,1:].flatten()
+            
+            for j in range(0,len(currentTuplesToSave)):
+                if j==len(currentTuplesToSave):
+                    fp.write(str(int(currentTuplesToSave[j]))+"\n")
+                else:
+                    fp.write(str(int(currentTuplesToSave[j]))+",")
+                    
+                    
+                
+        
+        
+    
+    
+    
+    
     
     
     
