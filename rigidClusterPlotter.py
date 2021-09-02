@@ -228,7 +228,6 @@ def frictionalForceChainPlotter(fileName,particleRadii,currentPosData,contacting
     
     #rescale magnitudes
     magnitude = scalar*magnitude
-
     
     xPos = currentPosData[:,0]
     yPos = currentPosData[:,1]
@@ -462,7 +461,56 @@ def rigidClusterMovieComposer(hydroDir,frictionalDir,rigidClusterDir,outputDir):
         
         
         Image.fromarray(rgba).save(os.path.join(outputDir,str(i)+".png"))
+
+
+def fricitonalFrictionlessHydroPlotter(topDir,fileName,outputDir):
     
+    
+    
+    
+    dwgForces = svgwrite.Drawing(os.path.join(topDir,fileName+"_frictional.svg"), size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
+    
+    
+    #rescale magnitudes
+    hydroForces = scalarHydroForces*hydroForces
+    frictionalForces = scalarFrictionalForces*frictionalForces
+
+    
+    xPos = posData[:,0]
+    yPos = posData[:,1]
+    #First plot all the circles
+    for i in range(0,len(particleRadii)):
+        dwgForces.add(svgwrite.shapes.Circle(center=(xPos[i], yPos[i]), r=particleRadii[i],fill='white',stroke='black',stroke_width=.1,))
+        
+    #Next plot all the frictional forces in red and the hydrodynamic forces in blue
+    
+    (numRows,_) =  np.shape(contactingPairs)
+    
+    for i in range(0,numRows):
+        firstParticleIndex = contactingPairs[i,0]
+        secondParticleIndex = contactingPairs[i,1] 
+        
+        
+        xPos1 = xPos[int(firstParticleIndex)]
+        yPos1 = yPos[int(firstParticleIndex)]
+        
+        xPos2 = xPos[int(secondParticleIndex)]
+        yPos2 = yPos[int(secondParticleIndex)]
+        
+        hydroForceMag = hydroForces[i]
+        frictionalForceMag = frictionalForces[i]
+        
+        if ((xPos1-xPos2)**2 + (yPos1-yPos2)**2 < systemSizeLx/threshold):
+            
+            if frictionalForceMag != 0:
+                dwgForces.add(svgwrite.shapes.Line(start=(xPos1, yPos1), end=(xPos2, yPos2),stroke_width=frictionalForceMag,stroke="red",))
+            if hydroForceMag != 0:
+                dwgForces.add(svgwrite.shapes.Line(start=(xPos1, yPos1), end=(xPos2, yPos2),stroke_width=hydroForceMag,stroke="blue",))
+            
+            
+
+    dwgForces.save()   
+
     
         
         
