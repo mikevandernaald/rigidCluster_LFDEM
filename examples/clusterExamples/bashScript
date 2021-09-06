@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --job-name=rigidcalc_mu1_VF0.77
+#SBATCH --output=rigidClusterCalc3.out
+#SBATCH --error=rigidClusterCalc3.err
+#SBATCH --time=12:00:00
+#SBATCH --account=pi-jaeger
+#SBATCH --partition=broadwl
+#SBATCH --nodes=1
+#SBATCH --ntasks=1
+#SBATCH --mem-per-cpu=16000
+
+
+module load python
+
+
+python3 /home/mrv/pebbleCode/scripts/9_3_2021/mu_1/VF0.77/pythonScript.py
+

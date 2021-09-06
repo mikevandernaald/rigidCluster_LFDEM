@@ -77,7 +77,6 @@ for currentClusterList in clusterSizes:
     counter=counter+1
 
 
-nextSet = np.append(largestClusters[:-1],0)
+#Now that we have the relevant data for the return map.  We just throw out the last element and throw out the first element then concatenate together
 
-
-returnMapData = np.vstack([largestClusters,nextSet]).transpose()
+returnMapData = np.vstack([largestClusters[:-1],largestClusters[1:]]).transpose()
