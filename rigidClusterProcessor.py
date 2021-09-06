@@ -40,7 +40,7 @@ def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False,returnPebbleIDa
 
     """
     
-        
+
     
     with open(intFile) as fp:
         for i, line in enumerate(fp):
@@ -181,7 +181,8 @@ def rigidClusterDataGenerator(pebbleObj,returnClusterIDs=True):
         if returnClusterIDs == True:
             clusterID = [0]*numClusters
         
-        for i in range(0,numClusters):
+        counter = 0
+        for i in np.unique(clusterIDHolder[:,0]):
             currentCluster = clusterIDHolder[clusterIDHolder[:,0]==i][:,1:]
             
             currentCluster = np.unique(np.sort(currentCluster,axis=1), axis=0)
@@ -189,21 +190,24 @@ def rigidClusterDataGenerator(pebbleObj,returnClusterIDs=True):
             (numBonds,_) = np.shape(currentCluster)
             
             
-            numBondsPerCluster[i] = numBonds
-            clusterSizes[i] = len(np.unique(currentCluster.flatten()))
+            numBondsPerCluster[counter] = numBonds
+            clusterSizes[counter] = len(np.unique(currentCluster.flatten()))
+            if len(np.unique(currentCluster.flatten())) == 0:
+                breakpoint()
             if returnClusterIDs == True:
-                clusterID[i] = currentCluster
+                clusterID[counter] = currentCluster
             
+            counter=counter+1
         if returnClusterIDs == True:
             return clusterSizes,numBondsPerCluster,clusterID
         else:
-            clusterSizes,numBondsPerCluster
+            return clusterSizes,numBondsPerCluster
 
     
 
 
 
-def rigFileGenerator(topDir,outputDir,snapShotRange=False):
+def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True):
     """
     This finds all par and int files in a directory and spits out their rigidcluster statistics
     into a rig_ file
@@ -273,44 +277,44 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False):
                         fp.write(str(int(j))+'\t')
                     fp.write('\n')
             fp.write('\n')
-            fp.write('#Rigid Cluster IDs \n')
         fp.close()
+        if reportIDS==True: 
+            with open(rigidClusterFileName, 'a') as fp:
+                fp.write('#Rigid Cluster IDs \n')
+                
+                for i in range(0,len(currentClusterInfo)):
                     
-        with open(rigidClusterFileName, 'a') as fp:
-            
-            for i in range(0,len(currentClusterInfo)):
-                
-                fp.write('#snapShot = '+str(i)+'\n')
-                
-                currentSnapShot = currentClusterInfo[i]
-                
-                if currentSnapShot==[0]:
-                    fp.write(str(0)+'\n')
-                else:
-                    numClusters = len(currentSnapShot[0])
+                    fp.write('#snapShot = '+str(i)+'\n')
                     
-                    for k in range(0,numClusters):
-                        currentTuplesToSave = currentSnapShot[2][k].flatten()
-                        for j in range(0,len(currentTuplesToSave)):
-                            if j==len(currentTuplesToSave)-1:
-                                fp.write(str(int(currentTuplesToSave[j]))+"\n")
-                            else:
-                                fp.write(str(int(currentTuplesToSave[j]))+",")
+                    currentSnapShot = currentClusterInfo[i]
+                    
+                    if currentSnapShot==[0]:
+                        fp.write(str(0)+'\n')
+                    else:
+                        numClusters = len(currentSnapShot[0])
+                        
+                        for k in range(0,numClusters):
+                            currentTuplesToSave = currentSnapShot[2][k].flatten()
+                            for j in range(0,len(currentTuplesToSave)):
+                                if j==len(currentTuplesToSave)-1:
+                                    fp.write(str(int(currentTuplesToSave[j]))+"\n")
+                                else:
+                                    fp.write(str(int(currentTuplesToSave[j]))+",")
                             
             
             
-        fp.close()
+            fp.close()
             
             
     
-def rigFileReader(rigFile,snapShotRange=False):
+def rigFileReader(rigFile,snapShotRange=False,readInIDS=True):
     
     
     with open(rigFile, "r") as f1:   
         fileLines = f1.readlines()
         
     indexOfDataSplit = fileLines.index('#Rigid Cluster Bond Numbers\n')
-    numSnapshots = indexOfDataSplit-3
+    numSnapshots = indexOfDataSplit-2
 
     
     
@@ -332,6 +336,43 @@ def rigFileReader(rigFile,snapShotRange=False):
         rigidClusterSizes[counter] = np.fromstring(fileLines[i+1].replace('\t',' ').replace(',', '').replace('\n',''),sep=' ')
         numBonds[counter] = np.fromstring(fileLines[i+1+indexOfDataSplit].replace('\t',' ').replace(',', '').replace('\n',''),sep=' ')
         counter=counter+1
+        
+    if readInIDS == True:
+        clusterIDs = [0]*(upperSnapShotRange-lowerSnapShotRange)
+        
+        
+        snapShotLineIndices = np.zeros(numSnapshots)
+        #First we'll find the indices where each snapshot starts
+        for i in range(0,numSnapshots):
+            snapShotLineIndices[i] = int(fileLines.index('#snapShot = '+str(i)+'\n'))
+        
+        snapShotStartingPoints = snapShotLineIndices + 1
+        snapShotEndingPoints = snapShotLineIndices-1
+        snapShotEndingPoints = np.append(snapShotEndingPoints[1:],len(fileLines))
+        
+
+        for i in range(0,len(snapShotEndingPoints)):
+            currentFileLines = fileLines[int(snapShotStartingPoints[i]):int(snapShotEndingPoints[i])+1]
+
+            clusterIDHolder = []
+            for lines in currentFileLines:
+                currentLineArray = np.fromstring(lines.replace('\n',''),sep=',')
+                if np.array_equal(currentLineArray,np.array([0])):
+                    clusterIDHolder.append(currentLineArray)
+                else:
+                    currentLineArray = currentLineArray.reshape( ( int(len(currentLineArray)/2), 2) )
+                    clusterIDHolder.append(currentLineArray)
+            
+            clusterIDs[i] = clusterIDHolder
+            
+    return (rigidClusterSizes,numBonds,clusterIDs)
+                
+                
+                
+                
+            
+            
+        
         
         
     return rigidClusterSizes,numBonds

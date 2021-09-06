@@ -18,7 +18,7 @@ from PIL import Image
 
 
 
-def dataExtractorLFDEMFrictionalForces(parFile,intFile,snapShotRange=False):
+def dataExtractorLFDEMFrictionalForces(parFile,intFile,snapShotRange=False,intFileColumns=False):
     
     
     with open(intFile) as fp:
@@ -212,50 +212,7 @@ def dataExtractorLFDEMBothForces(parFile,intFile,snapShotRange=False):
     
     return (contactInfoHydro,contactInfoFrictional,positionData,particleRadii,systemSizeLx,systemSizeLz,numParticles)
 
-
-
-def frictionalForceChainPlotter(fileName,particleRadii,currentPosData,contactingPairs,magnitude,systemSizeLx,systemSizeLz,threshold,scalar):
-    #Make the initial svg object
-    # fileName =  r"C:\Users\mikev\Documents\code\rigidClusterPlotting\shite.svg"
-    # snapShot = 0
-    # currentPosData = positionData[:,:,snapShot]
-    # contactingPairs = contactInfo[snapShot][:,:2]
-    # magnitude = contactInfo[5][:,2]
-    # threshold=5
-    # scalar=10
-    
-    dwg = svgwrite.Drawing(fileName, size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
-    
-    #rescale magnitudes
-    magnitude = scalar*magnitude
-    
-    xPos = currentPosData[:,0]
-    yPos = currentPosData[:,1]
-    #First plot all the circles
-    for i in range(0,len(particleRadii)):
-        dwg.add(svgwrite.shapes.Circle(center=(xPos[i], yPos[i]), r=particleRadii[i],fill='white',stroke='black',stroke_width=.1,))
-        
-    #Next plot all the frictional contacts
-    
-    (numRows,_) =  np.shape(contactingPairs)
-    
-    for i in range(0,numRows):
-        firstParticleIndex = contactingPairs[i,0]
-        secondParticleIndex = contactingPairs[i,1] 
-        
-        
-        xPos1 = xPos[int(firstParticleIndex)]
-        yPos1 = yPos[int(firstParticleIndex)]
-        
-        xPos2 = xPos[int(secondParticleIndex)]
-        yPos2 = yPos[int(secondParticleIndex)]
-        
-        currentMag = magnitude[i]
-        
-        if (xPos1-xPos2)**2 + (yPos1-yPos2)**2 < systemSizeLx/threshold:
-            dwg.add(svgwrite.shapes.Line(start=(xPos1, yPos1), end=(xPos2, yPos2),stroke_width=currentMag,stroke="red",))
-    
-    dwg.save()   
+ 
     
     
 def rigidClusterPlotter(fileName,currentPosData,particleRadii,systemSizeLx,systemSizeLz,confObj,pebblesObj,analysisObj,rigidClusterStrokeWidth):
@@ -294,69 +251,7 @@ def rigidClusterPlotter(fileName,currentPosData,particleRadii,systemSizeLx,syste
     dwg.save()            
                 
     
-    
-def frictionalAndHydroForcePlotter(topDirHydro,topDirFrictional,fileName,particleRadii,currentPosData,contactingPairs,frictionalForces,hydroForces,systemSizeLx,systemSizeLz,threshold,scalarFrictionalForces,scalarHydroForces):
-    #Make the initial svg object
-    # fileName =  r"C:\Users\mikev\Documents\code\rigidClusterPlotting\shite.svg"
-    # particleRadii
-    # currentPosData = positionData[:,:,5]
-    # contactingPairs = contactInfoHydro[5][:,:2]
-    # hydroForces = contactInfoHydro[5][:,2]
-    # frictionalForces = contactInfoFrictional[5][:,2]
-    # threshold=5
-    # scalar=10
-    # 
-    
-    
-    
-    dwgFrictional = svgwrite.Drawing(os.path.join(topDirFrictional,fileName+"_frictional.svg"), size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
-    dwgHydro = svgwrite.Drawing(os.path.join(topDirHydro,fileName+"_hydro.svg"), size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
-    
-    
-    #rescale magnitudes
-    hydroForces = scalarHydroForces*hydroForces
-    frictionalForces = scalarFrictionalForces*frictionalForces
 
-    
-    xPos = currentPosData[:,0]
-    yPos = currentPosData[:,1]
-    #First plot all the circles
-    #breakpoint()
-    for i in range(0,len(particleRadii)):
-        dwgFrictional.add(svgwrite.shapes.Circle(center=(xPos[i], yPos[i]), r=particleRadii[i],fill='white',stroke='black',stroke_width=.1,))
-        dwgHydro.add(svgwrite.shapes.Circle(center=(xPos[i], yPos[i]), r=particleRadii[i],fill='white',stroke='black',stroke_width=.1,))
-        
-    #Next plot all the frictional forces in red and the hydrodynamic forces in blue
-    
-    (numRows,_) =  np.shape(contactingPairs)
-    
-    for i in range(0,numRows):
-        firstParticleIndex = contactingPairs[i,0]
-        secondParticleIndex = contactingPairs[i,1] 
-        
-        
-        xPos1 = xPos[int(firstParticleIndex)]
-        yPos1 = yPos[int(firstParticleIndex)]
-        
-        xPos2 = xPos[int(secondParticleIndex)]
-        yPos2 = yPos[int(secondParticleIndex)]
-        
-        hydroForceMag = hydroForces[i]
-        frictionalForceMag = frictionalForces[i]
-        
-        if ((xPos1-xPos2)**2 + (yPos1-yPos2)**2 < systemSizeLx/threshold):
-            
-            if frictionalForceMag != 0:
-                dwgFrictional.add(svgwrite.shapes.Line(start=(xPos1, yPos1), end=(xPos2, yPos2),stroke_width=frictionalForceMag,stroke="red",))
-            if hydroForceMag != 0:
-                dwgHydro.add(svgwrite.shapes.Line(start=(xPos1, yPos1), end=(xPos2, yPos2),stroke_width=hydroForceMag,stroke="blue",))
-            
-            
-
-    dwgFrictional.save()   
-    dwgHydro.save()   
-    
-    
     
 def generatePlots(topDir,parFile,intFile,snapShot,scalarFrictionalForces,scalarHydroForces,rigidClusterStrokeWidth,name):
     
@@ -463,25 +358,32 @@ def rigidClusterMovieComposer(hydroDir,frictionalDir,rigidClusterDir,outputDir):
         Image.fromarray(rgba).save(os.path.join(outputDir,str(i)+".png"))
 
 
-def fricitonalFrictionlessHydroPlotter(topDir,fileName,outputDir):
+
+def forcePlotter(positions,radii,forces,systemSizeLx,systemSizeLz,forceScalar=1,outputFile=False,inputDwg=False,forceColor="red",threshold=5):
     
+    if outputFile==False:
+        svgFile = svgwrite.Drawing(size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
+    else: 
+        svgFile = svgwrite.Drawing(outputFile, size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
     
-    
-    
-    dwgForces = svgwrite.Drawing(os.path.join(topDir,fileName+"_frictional.svg"), size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
+    if inputDwg != False:
+        svgFile = inputDwg
     
     
     #rescale magnitudes
-    hydroForces = scalarHydroForces*hydroForces
-    frictionalForces = scalarFrictionalForces*frictionalForces
-
+    forceMagnitudes = forceScalar*forces[:,2:]
+    #Get the particle ids of relevant particles
+    contactingPairs = forces[:,:2]
     
-    xPos = posData[:,0]
-    yPos = posData[:,1]
-    #First plot all the circles
-    for i in range(0,len(particleRadii)):
-        dwgForces.add(svgwrite.shapes.Circle(center=(xPos[i], yPos[i]), r=particleRadii[i],fill='white',stroke='black',stroke_width=.1,))
-        
+
+    if inputDwg == False:
+        xPos = positions[:,0]
+        yPos = positions[:,1]
+        #First plot all the circles
+        #breakpoint()
+        for i in range(0,len(radii)):
+            svgFile.add(svgwrite.shapes.Circle(center=(xPos[i], yPos[i]), r=radii[i],fill='white',stroke='black',stroke_width=.1,))
+            
     #Next plot all the frictional forces in red and the hydrodynamic forces in blue
     
     (numRows,_) =  np.shape(contactingPairs)
@@ -489,28 +391,29 @@ def fricitonalFrictionlessHydroPlotter(topDir,fileName,outputDir):
     for i in range(0,numRows):
         firstParticleIndex = contactingPairs[i,0]
         secondParticleIndex = contactingPairs[i,1] 
-        
-        
+
         xPos1 = xPos[int(firstParticleIndex)]
         yPos1 = yPos[int(firstParticleIndex)]
         
         xPos2 = xPos[int(secondParticleIndex)]
         yPos2 = yPos[int(secondParticleIndex)]
         
-        hydroForceMag = hydroForces[i]
-        frictionalForceMag = frictionalForces[i]
+        forceMag = forceMagnitudes[i]
         
         if ((xPos1-xPos2)**2 + (yPos1-yPos2)**2 < systemSizeLx/threshold):
-            
-            if frictionalForceMag != 0:
-                dwgForces.add(svgwrite.shapes.Line(start=(xPos1, yPos1), end=(xPos2, yPos2),stroke_width=frictionalForceMag,stroke="red",))
-            if hydroForceMag != 0:
-                dwgForces.add(svgwrite.shapes.Line(start=(xPos1, yPos1), end=(xPos2, yPos2),stroke_width=hydroForceMag,stroke="blue",))
-            
+            if forceMag != 0:
+                svgFile.add(svgwrite.shapes.Line(start=(xPos1, yPos1), end=(xPos2, yPos2),stroke_width=forceMag,stroke=forceColor,))
+                
+        if outputFile==False:
+            return svgFile
+        else:
+            svgFile.save()  
+            return svgFile
             
 
-    dwgForces.save()   
-
+    
+    
+    
     
         
         

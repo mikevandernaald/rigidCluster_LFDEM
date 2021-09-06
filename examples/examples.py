@@ -7,62 +7,77 @@ Created on Fri Aug 27 11:51:05 2021
 
 import rigidClusterProcessor
 import os
-import rigidClusterPlotter
+import numpy as np
 
 
 """
-Example of how to use the rigidClusterProcessor
+Generating a rig_ file
+rig_ files have information about how many clusters there are, their size in both connections and particles, as well as the particle ID's of the
+participating clusters.
 """
-#Change this to where the Github examples folder is
-dataDir = r"C:\Users\mikev\Documents\GitHub\rigidCluster_LFDEM\examples"
+
+#Path to the directory that has par_ and int_ files that you want to make corresponding rig_ files for
+topDir = r"C:\Users\mikev\Documents\temp"
+#Path where rig_ files are outputted
+outputDir = topDir
+#snapShotRange gives the range of snapshots to process.  We set it to False if we want it to process all snapshots
+#Alternatively one could set snapShotRange = [0,5] to process the first five snapshots.
+snapShotRange = False
+#reportIDs tells the function to report ID's or not.  We'll have it report ID's.  
+reportIDS = True
 
 
-#These are just example LF_DEM files for a system with phi=0.78, stress = 20.
-intFile = os.path.join(dataDir,r"int_D2N2000VF0.78Bidi1.4_0.5Square_1_pardata_phi0.78_stress20cl.dat")
-parFile = os.path.join(dataDir,r"par_D2N2000VF0.78Bidi1.4_0.5Square_1_pardata_phi0.78_stress20cl.dat")
-
-#This is the snapshot range that we want the cluster information for.
-snapShotRange = [130,132]
-
-
-#Each element in the list clusterInformation contains the cluster info for a particle snapshot.
-clusterInformation = rigidClusterProcessor.pebbleGame_LFDEMSnapshot( parFile,intFile,snapShotRange )
-
-
-clusterInfo_snapShot130 = clusterInformation[0]
-
-clusters=''
-
-for i in clusterInfo_snapShot130[0]:
-    clusters = clusters+str(i)+", "
-print("Snapshot 130 has clusters of the size:  " + clusters)
-
-
+rigidClusterProcessor.rigFileGenerator(topDir,outputDir,snapShotRange,reportIDS)
 
 
 """
-Examples of how to use the rigidClusterPlotter
+Reading rig_ files
 """
 
-
-imageOutputDir = r"C:\Users\mikev\Documents\GitHub\rigidCluster_LFDEM\examples"
-
-#Change this to where the Github examples folder is
-dataDir = r"C:\Users\mikev\Documents\GitHub\rigidCluster_LFDEM\examples"
-
-
-#These are just example LF_DEM files for a system with phi=0.78, stress = 20.
-intFile = os.path.join(dataDir,r"int_D2N2000VF0.78Bidi1.4_0.5Square_1_pardata_phi0.78_stress20cl.dat")
-parFile = os.path.join(dataDir,r"par_D2N2000VF0.78Bidi1.4_0.5Square_1_pardata_phi0.78_stress20cl.dat")
+#rigFile is the path to the rig file you want to read in.
+rigFile = r"C:\Users\mikev\Documents\temp\rig_D2N2000VF0.8Bidi1.4_0.5Square_1_pardata_phi0.8_stress10cl.dat"
+#snapShotRange gives the range of snapshots to process.  We set it to False if we want it to process all snapshots
+#Alternatively one could set snapShotRange = [0,5] to process the first five snapshots.
+snapShotRange = False
+#reportIDs tells the function read in IDs
+readInIDS = True
 
 
-snapShot = 130
+clusterSizes, numBonds, clusterIDs = rigidClusterProcessor.rigFileReader(rigFile,snapShotRange,readInIDS)
+
+#clusterSizes is a list.  Each element of the list is a numpy array that contains
+#integers with sizes of
 
 
-scalarFrictionalForces = 1/20
-scalarHydroForces = 1/20
-rigidClusterStrokeWidth = .5
-name = "exampleOutput"
 
 
-rigidClusterPlotter.generatePlots(imageOutputDir,parFile,intFile,snapShot,scalarFrictionalForces,scalarHydroForces,rigidClusterStrokeWidth,name)
+"""
+Calculating return maps
+""" 
+#Read in the rig file as above
+#rigFile is the path to the rig file you want to read in.
+rigFile = r"C:\Users\mikev\Documents\temp\rig_D2N2000VF0.8Bidi1.4_0.5Square_1_pardata_phi0.8_stress10cl.dat"
+#snapShotRange gives the range of snapshots to process.  We set it to False if we want it to process all snapshots
+#Alternatively one could set snapShotRange = [0,5] to process the first five snapshots.
+snapShotRange = False
+#reportIDs tells the function read in IDs
+readInIDS = True
+
+
+clusterSizes, numBonds, clusterIDs = rigidClusterProcessor.rigFileReader(rigFile,snapShotRange,readInIDS)
+
+
+#loop through each snapshot and find the largest cluster sizes
+
+largestClusters = np.zeros(len(clusterSizes))
+
+counter=0
+for currentClusterList in clusterSizes:
+    largestClusters[counter] = np.max(currentClusterList)
+    counter=counter+1
+
+
+nextSet = np.append(largestClusters[:-1],0)
+
+
+returnMapData = np.vstack([largestClusters,nextSet]).transpose()
