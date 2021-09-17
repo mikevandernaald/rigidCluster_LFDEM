@@ -9,10 +9,11 @@ import svgwrite
 import numpy as np
 import itertools
 import os 
-import suspensionRigidCluster
+import rigidClusterProcessor
 import Hessian as HS
 import Analysis as AN
 import matplotlib
+import re
 
 from PIL import Image
 
@@ -267,7 +268,7 @@ def generatePlots(topDir,parFile,intFile,snapShot,scalarFrictionalForces,scalarH
     (contactInfoHydro,contactInfoFrictional,positionData,particleRadii,systemSizeLx,systemSizeLz,numParticles) = dataExtractorLFDEMBothForces(parFile,intFile,[snapShot,snapShot+1])
 
 
-    (clusterHolder,ThisPebble,ThisConf) = suspensionRigidCluster.pebbleGame_LFDEMSnapshot(parFile,intFile,False,[snapShot,snapShot+1])
+    (clusterHolder,ThisPebble,ThisConf) = rigidClusterProcessor.pebbleGame_LFDEMSnapshot(parFile,intFile,False,[snapShot,snapShot+1])
     ThisHessian = HS.Hessian(ThisConf)
 
     ThisAnalysis = AN.Analysis(ThisConf, ThisPebble, ThisHessian, 0.01, False)
@@ -290,7 +291,7 @@ def rigidCluserMovieMaker(topDir,parFile,intFile,scalarFrictionalForces,scalarHy
     topDirFrictional = os.path.join(topDir,"frictionalForces")
     
     (contactInfoHydro,contactInfoFrictional,positionData,particleRadii,systemSizeLx,systemSizeLz,numParticles) = dataExtractorLFDEMBothForces(parFile,intFile,snapShotRange)
-    clusterHolder= suspensionRigidCluster.pebbleGame_LFDEMSnapshot(parFile,intFile,False,snapShotRange)
+    clusterHolder= rigidClusterProcessor.pebbleGame_LFDEMSnapshot(parFile,intFile,False,snapShotRange)
 
     print("Done computing rigid cluster information.  Starting movie making..")
     if snapShotRange == False:
@@ -409,6 +410,63 @@ def forcePlotter(positions,radii,forces,systemSizeLx,systemSizeLz,forceScalar=1,
         else:
             svgFile.save()  
             return svgFile
+        
+        
+
+
+def returnMapPlotter(rigFileList,numParticles):
+    """
+    This function takes in a list of paths to different rig_ files and then makes the return maps plots for them.
+    
+ 
+        
+        
+    """
+    
+    height = 8
+    width = 1.61803398875*height
+    f, ax = matplotlib.pyplot.subplots(figsize=(width,height))
+    
+    ax.set_xlabel("$S_{max,\gamma}$",fontsize=25)
+    ax.set_ylabel("$S_{max,\gamma+1}$",fontsize=25)
+    ax.set_ylim(0,numParticles)
+    ax.set_xlim(0,numParticles)
+    colorList = ["blue","orange","green","red","purple","brown","pink","gray","olive","cyan","black"]
+    
+    bigCounter=0
+    for rigFile in rigFileList:
+        
+        result = re.search('_stress(.*)cl', rigFile)
+        currentStress = result.group(1)
+        
+        clusterSizes, numBonds, clusterIDs = rigidClusterProcessor.rigFileReader(rigFile)
+        largestClusters = np.zeros(len(clusterSizes))
+        
+        
+        counter=0
+        for currentClusterList in clusterSizes:
+            largestClusters[counter] = np.max(currentClusterList)
+            counter=counter+1
+
+
+        #Now that we have the relevant data for the return map.  We just throw out the last element and throw out the first element then concatenate together
+        returnMapData = np.vstack([largestClusters[:-1],largestClusters[1:]]).transpose()
+    
+        ax.plot(returnMapData[:,0],returnMapData[:,1],'o',color=colorList[bigCounter],label="$\sigma = $"+currentStress,alpha=0.5)
+        
+        bigCounter = bigCounter+1
+        
+    # Shrink current axis by 20%
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+    # Put a legend to the right of the current axis
+    ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+    matplotlib.pyplot.subplots_adjust(bottom=0.18)
+    matplotlib.pyplot.subplots_adjust(left=0.22)
+    matplotlib.pyplot.tight_layout()
+    matplotlib.pyplot.grid()
+    
+    return ax
             
 
     
