@@ -8,6 +8,8 @@ import Hessian as HS
 import Analysis as AN
 import itertools
 import re
+from scipy.spatial.distance import pdist
+
 """
 Date:  2/5/2021
 Authors: Mike van der Naald
@@ -323,8 +325,13 @@ def rigFileReader(rigFile,snapShotRange=False,readInIDS=True):
         lowerSnapShotRange = 0
         upperSnapShotRange = numSnapshots
     else:
-        lowerSnapShotRange = snapShotRange[0]
-        upperSnapShotRange = snapShotRange[1]
+        if snapShotRange[1]==-1:
+            lowerSnapShotRange = snapShotRange[0]
+            upperSnapShotRange = numSnapshots
+        else:
+            lowerSnapShotRange = snapShotRange[0]
+            upperSnapShotRange = snapShotRange[1]
+            
     
     
     rigidClusterSizes = [0]*(upperSnapShotRange-lowerSnapShotRange)
@@ -350,8 +357,8 @@ def rigFileReader(rigFile,snapShotRange=False,readInIDS=True):
         snapShotEndingPoints = snapShotLineIndices-1
         snapShotEndingPoints = np.append(snapShotEndingPoints[1:],len(fileLines))
         
-
-        for i in range(0,len(snapShotEndingPoints)):
+        counter=0
+        for i in range(lowerSnapShotRange,upperSnapShotRange):
             currentFileLines = fileLines[int(snapShotStartingPoints[i]):int(snapShotEndingPoints[i])+1]
 
             clusterIDHolder = []
@@ -363,50 +370,154 @@ def rigFileReader(rigFile,snapShotRange=False,readInIDS=True):
                     currentLineArray = currentLineArray.reshape( ( int(len(currentLineArray)/2), 2) )
                     clusterIDHolder.append(currentLineArray)
             
-            clusterIDs[i] = clusterIDHolder
-            
-    return (rigidClusterSizes,numBonds,clusterIDs)
-                
-                
-                
-                
-            
-            
-        
-        
-        
-    return rigidClusterSizes,numBonds
+            clusterIDs[counter] = clusterIDHolder
+            counter=counter+1
+        return (rigidClusterSizes,numBonds,clusterIDs)
+    else:
+        return rigidClusterSizes,numBonds
     
 
-def rigIDExtractor(pebbleObj):
+  
+
+def phiRigCalculator(rigFile,snapShotStartingPoint,numParticles,threshHold):
     
-    #Load in all the relevant data.  The first column has the ID of the cluster and the second and third rows tell you the particles i and j which are in that cluster ID
-    clusterIDHolder = np.transpose(np.vstack([pebbleObj.cluster,pebbleObj.Ifull,pebbleObj.Jfull]))
+    (rigidClusterSizes,numBonds,clusterIDs) = rigFileReader(rigFile)
     
-    #Remove all rows that have -1 in the first column.  Those are contacts that are not participating in a cluster
-    clusterIDHolder = clusterIDHolder[clusterIDHolder[:,0] != -1]
+    largestClusters = np.zeros(len(rigidClusterSizes))
     
-    numClusters = len(np.unique(clusterIDHolder[:,0]))
+    counter=0
+    for currentClusterList in rigidClusterSizes:
+        largestClusters[counter] = np.max(currentClusterList)
+        counter=counter+1
     
-    for i in range(0,numClusters):
+    #If the value in the list is true then it is larger than the threshold size.
+    largestClusters = largestClusters[snapShotStartingPoint:]/numParticles >= threshHold
+    
+    return largestClusters
+    
+    
+def viscosityAverager(dataFile):
+    #dataFile = r"C:\Users\mikev\Documents\data\rigidClusterData\data_D2N2000VF0.8Bidi1.4_0.5Square_1_pardata_phi0.8_stress100cl.dat"
+    
+    
+    with open(dataFile, "r") as f1:   
+        fileLines = f1.readlines()
         
-        with open(rigidClusterFileName, 'w') as fp:
+    totalNumLines = len(fileLines)
+    
+    viscosityHolder = np.zeros(totalNumLines-45)
+    
+    counter=0
+    for i in range(45,totalNumLines):
+        np.fromstring(fileLines[i].replace("n", "0"),sep=' ')
+        viscosityHolder[counter] = np.fromstring(fileLines[i].replace("n", "0"),sep=' ')[4]
+          
+        counter=counter+1
+    return viscosityHolder
+        
+    
+
+    
+    
+def rigidClusterLength(rigFile,parFile,numParticles,Lx,Ly,snapShotRange=False,rotatePositions=False):
+    
+    #Load in position data
+    positionData = np.loadtxt(parFile,usecols=[1,2,4])
+    numSnapshots = int(np.shape(positionData)[0]/numParticles)
+    
+    
+    if snapShotRange == False:
+        lowerSnapShotRange = 0
+        upperSnapShotRange = numSnapshots
+    else:
+        if snapShotRange[1]==-1:
+            lowerSnapShotRange = snapShotRange[0]
+            upperSnapShotRange = numSnapshots
+        else:
+            lowerSnapShotRange = snapShotRange[0]
+            upperSnapShotRange = snapShotRange[1]
             
-            currentTuplesToSave = clusterIDHolder[clusterIDHolder[:,0]==i][:,1:].flatten()
+    
+
+    def snapShotLengthCalc(pos,Lx,Ly):
+        (numParticles,_) = np.shape(pos)
+        
+        
+        #x distances 
+        pos_1d = pos[:, 0][:, np.newaxis] # shape (N, 1)
+        dist_1dx = pdist(pos_1d)  # shape (N * (N - 1) // 2, )
+        dist_1dx[dist_1dx > Lx * 0.5] -= Lx
+        
+        #y distances next
+        pos_1d = pos[:, 1][:, np.newaxis]  # shape (N, 1)
+        dist_1dy = pdist(pos_1d)  # shape (N * (N - 1) // 2, )
+        dist_1dy[dist_1dy > Ly * 0.5] -= Ly
+        
+        
+        largestExtentX = np.max(dist_1dx)
+        largestExtentY = np.max(dist_1dy)
+        
+        return largestExtentX,largestExtentY
+    
+    
+    #Read in rigid cluster information
+    _,_,clusterIDs = rigFileReader(rigFile,snapShotRange)
+    
+    #Delete the first column now that we no longer need particle radii
+    positionData=positionData[:,1:]
+    
+    #If we're rotating positions this is where we'll do it
+    if rotatePositions != False:
+        rotationMatrix = (1/np.sqrt(2))*np.array([[1,1],[-1,1]])
+        
+        numRows,_ = np.shape(positionData)
+        
+        for i in range(0,numRows):
+            positionData[i,:] = np.matmul(rotationMatrix,positionData[i,:])
+        
+    
+
+    
+    #Reformat the position data to be a 3 dimensional array
+    newPosData = np.zeros((numParticles,2,numSnapshots))
+    
+    for i in range(0,numSnapshots):
+        newPosData[:,:,i] = positionData[i*numParticles:(i+1)*numParticles,:]
+
+    positionData = newPosData
+    positionData = positionData[:,:,lowerSnapShotRange:upperSnapShotRange]
+    
+    
+    xExtentHolder = (upperSnapShotRange-lowerSnapShotRange)*[[]]
+    yExtentHolder = (upperSnapShotRange-lowerSnapShotRange)*[[]]
+    
+
+    for i in range(0,upperSnapShotRange-lowerSnapShotRange):
+        
+        currentPos = positionData[:,:,i]
+        currentClusterIDs = clusterIDs[i]
+        
+        clusterExtentHolderX = []
+        clusterExtentHolderY = []
+        
+        for clusters in currentClusterIDs:
             
-            for j in range(0,len(currentTuplesToSave)):
-                if j==len(currentTuplesToSave):
-                    fp.write(str(int(currentTuplesToSave[j]))+"\n")
-                else:
-                    fp.write(str(int(currentTuplesToSave[j]))+",")
-                    
-                    
-                
+            allIDsInCurrentCluster = np.unique(clusters)
+            allIDsInCurrentCluster = [int(ids) for ids in allIDsInCurrentCluster]
+            positionsOfParticlesInCurrentCluster = currentPos[allIDsInCurrentCluster,:]
+            
+            (largestExtentX,largestExtentY) = snapShotLengthCalc(positionsOfParticlesInCurrentCluster,Lx,Ly)
+            
+            clusterExtentHolderX.append(largestExtentX)
+            clusterExtentHolderY.append(largestExtentY)
+            
+        xExtentHolder[i] = clusterExtentHolderX
+        yExtentHolder[i] = clusterExtentHolderY
+            
+    return (xExtentHolder,yExtentHolder)
         
-        
-    
-    
-    
+
+
     
     
     

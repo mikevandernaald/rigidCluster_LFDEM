@@ -19,7 +19,7 @@ from PIL import Image
 
 
 
-def dataExtractorLFDEMFrictionalForces(parFile,intFile,snapShotRange=False,intFileColumns=False):
+def dataExtractorLFDEMPositionsRadii(parFile,intFile,snapShotRange=False):
     
     
     with open(intFile) as fp:
@@ -65,61 +65,8 @@ def dataExtractorLFDEMFrictionalForces(parFile,intFile,snapShotRange=False,intFi
     positionData = newPosData
     positionData = positionData[:,:,lowerSnapShotRange:upperSnapShotRange]
     #Now lets load in the particle contacts from intFile and ignore the header lines (first 25 lines).
-    with open(intFile) as f1:
-        fileLines = f1.readlines()[24:]
-
-    numLines = np.shape(fileLines)[0]
-
-    #We'll first find every line in intFile that starts with "#" as that is a line where a new snapshop starts.
-    counter=0
-    linesWhereDataStarts=np.array([])
-    for lines in fileLines:
-        if (np.shape(np.fromstring(lines,sep=' '))[0]==0) & ("#" in str(lines)):
-            linesWhereDataStarts = np.append(linesWhereDataStarts, counter)
-        counter=counter+1
-
-    #At this point we can do a sanity check to see if numSnapshots is equal to the number of lines where the data starts.
-    if np.shape(linesWhereDataStarts)[0]!=numSnapshots:
-        raise TypeError("The number of snapshots in the par file does not match the number of snapshots in the int file.  Please make sure both files correspond to the same simulation.")
-
-    #Now lets make a python list to store all the different contacts for each snapshot
-    contactInfo = [0] * (upperSnapShotRange-lowerSnapShotRange)
-
-    #Now we'll loop through each snapshot and store only the first three columns.  This should hopefully make this less expensive.
-    #The first column is the first particle index, the second is the second particle index and the final column tells us the contact type.
-    #We will also be ignoring any interaction where the contact type is 0 as that is a hydrodynamic interaction.
-    counter = 0
-    for i in range(lowerSnapShotRange,upperSnapShotRange):
-        if i==numSnapshots-1:
-            #If there is a 0 in the third column then that means the particles are not in contact and we can throw that row our.
-            currentContacts = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(numLines)),usecols=(0, 1, 2,3,5,12,14))
-            currentContacts = currentContacts[np.where(currentContacts[:, 2] > 1), :][0]
-            xComponentsOfFrictionalForces = currentContacts[:,3]+currentContacts[:,5]
-            zComponentsOfFrictionalForces = currentContacts[:,4]+currentContacts[:,6]
-            magnitudes = np.sqrt(xComponentsOfFrictionalForces**2+zComponentsOfFrictionalForces**2)
-            if len(currentContacts)==0:
-                contactInfo[counter] = 0
-            else:    
-                contactInfo[counter] = np.concatenate((np.expand_dims(currentContacts[:,0], axis=1),np.expand_dims(currentContacts[:,1], axis=1),np.expand_dims(magnitudes, axis=1)),axis=1)
-            
-        else:
-            currentContacts = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(linesWhereDataStarts[i + 1])),usecols=(0, 1, 2,3,5,12,14))
-            currentContacts = currentContacts[np.where(currentContacts[:, 2] > 1), :][0]
-            xComponentsOfFrictionalForces = currentContacts[:,3]+currentContacts[:,5]
-            zComponentsOfFrictionalForces = currentContacts[:,4]+currentContacts[:,6]
-            magnitudes = np.sqrt(xComponentsOfFrictionalForces**2+zComponentsOfFrictionalForces**2)
-            if len(currentContacts)==0:
-                contactInfo[counter] = 0
-            else:    
-                contactInfo[counter] = np.concatenate((np.expand_dims(currentContacts[:,0], axis=1),np.expand_dims(currentContacts[:,1], axis=1),np.expand_dims(magnitudes, axis=1)),axis=1)
-        del currentContacts
-        counter=counter+1
-
-    #We no longer need fileLines and it takes up a lot of RAM so we can delete it (not sure if this is needed, python interpreters are pretty good about this stuff)
-    del fileLines
     
-    return (contactInfo,positionData,particleRadii,systemSizeLx,systemSizeLz,numParticles)
-
+    return positionData,particleRadii,systemSizeLx,systemSizeLz,snapShotRange
 
 
 def dataExtractorLFDEMBothForces(parFile,intFile,snapShotRange=False):
@@ -216,41 +163,50 @@ def dataExtractorLFDEMBothForces(parFile,intFile,snapShotRange=False):
  
     
     
-def rigidClusterPlotter(fileName,currentPosData,particleRadii,systemSizeLx,systemSizeLz,confObj,pebblesObj,analysisObj,rigidClusterStrokeWidth):
+def rigidClusterPlotGenerator(fileName,snapShot,parFile,intFile,rigFile,rigidClusterStrokeWidth):
+    colorForCluster = matplotlib.colors.to_hex([0.085, 0.532, 0.201])
 
-    
+    #Load in the positions and radii and plot the packing
+    (currentPosData,particleRadii,systemSizeLx,systemSizeLz,_) = dataExtractorLFDEMPositionsRadii(parFile,intFile,[snapShot,snapShot+1])
+
     dwg = svgwrite.Drawing(fileName, size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
     
-    xPos = currentPosData[:,0]
-    yPos = currentPosData[:,1]
+    currentPosData = currentPosData[:,:,0]
+    
+    xPos = currentPosData[:,0]+ 11 * systemSizeLx / 20
+    yPos = currentPosData[:,1]+ 11 * systemSizeLz / 20
     #First plot all the circles
     numParticles = len(particleRadii)
     for i in range(0,numParticles):
         dwg.add(svgwrite.shapes.Circle(center=(xPos[i], yPos[i]), r=particleRadii[i],fill='white',stroke='black',stroke_width=.1,))
 
-    numUniqueColorsNeeded = np.shape(np.unique(pebblesObj.cluster))[0]-1
     
 
-    colorForCluster = matplotlib.colors.to_hex([0.085, 0.532, 0.201])
+    #Load in the rigidCluster IDs for the packing
+    (_,_,clusterIDs)=rigidClusterProcessor.rigFileReader(rigFile,[snapShot,snapShot+1])
 
 
-    if numUniqueColorsNeeded!=0: 
-        for k in range(len(pebblesObj.Ifull)):
-            # this version depends on pebble numbering, so use 2nd version
-            y0, y1, x0, x1 = confObj.getConPos2(pebblesObj.Ifull[k],pebblesObj.Jfull[k])
-            x0 = x0 + 11 * systemSizeLx / 20
-            x1 = x1 + 11 * systemSizeLx / 20
-            y0 = y0 + 11 * systemSizeLz / 20
-            y1 = y1 + 11 * systemSizeLz / 20
+    #Loop through all the clusters and plot them on the previous SVG object
+    for clusters in clusterIDs[0]:
+        
+        (numContactsInCluster,_) = np.shape(clusters)
+        
+        for i in range(0,numContactsInCluster):
+            particleI = int(clusters[i,0])
+            particleJ = int(clusters[i,1])
+            
+            x0 = currentPosData[particleI,0] + 11 * systemSizeLx / 20
+            y0 = currentPosData[particleI,1] + 11 * systemSizeLz / 20
+            
+            x1 = currentPosData[particleJ,0] + 11 * systemSizeLx / 20
+            y1 = currentPosData[particleJ,1] + 11 * systemSizeLz / 20
             if (x0-x1)**2 + (y0-y1)**2 < systemSizeLx/5:
-                if (pebblesObj.cluster[k] != -1):
-                    if (k >= analysisObj.ncon):
-                        dwg.add(svgwrite.shapes.Line(start=(x0, y0), end=(x1, y1),stroke_width=rigidClusterStrokeWidth,stroke=colorForCluster,))
-                    else:
-                        dwg.add(svgwrite.shapes.Line(start=(x0, y0), end=(x1, y1),stroke_width=rigidClusterStrokeWidth,stroke=colorForCluster,))
-                    
-    dwg.save()            
+                dwg.add(svgwrite.shapes.Line(start=(x0, y0), end=(x1, y1),stroke_width=rigidClusterStrokeWidth,stroke=colorForCluster,))
                 
+            
+            
+    dwg.save()
+
     
 
     
@@ -362,6 +318,7 @@ def rigidClusterMovieComposer(hydroDir,frictionalDir,rigidClusterDir,outputDir):
 
 def forcePlotter(positions,radii,forces,systemSizeLx,systemSizeLz,forceScalar=1,outputFile=False,inputDwg=False,forceColor="red",threshold=5):
     
+  
     if outputFile==False:
         svgFile = svgwrite.Drawing(size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
     else: 
@@ -431,13 +388,30 @@ def returnMapPlotter(rigFileList,numParticles):
     ax.set_ylabel("$S_{max,\gamma+1}$",fontsize=25)
     ax.set_ylim(0,numParticles)
     ax.set_xlim(0,numParticles)
-    colorList = ["blue","orange","green","red","purple","brown","pink","gray","olive","cyan","black"]
+    colorList = ["blue","orange","green","red","purple","brown","olive","cyan","black","lawngreen","indigo"]
     
-    bigCounter=0
+    stressList = []
     for rigFile in rigFileList:
         
         result = re.search('_stress(.*)cl', rigFile)
         currentStress = result.group(1)
+        stressList.append(float(currentStress))
+        
+    
+        
+    stressList = np.array(stressList)
+    stressList = np.sort(stressList)
+    
+        
+    
+    
+    
+    for rigFile in rigFileList:
+        
+        result = re.search('_stress(.*)cl', rigFile)
+        currentStress = result.group(1)
+        
+        colorCounter = np.where(stressList==float(currentStress))[0][0]
         
         clusterSizes, numBonds, clusterIDs = rigidClusterProcessor.rigFileReader(rigFile)
         largestClusters = np.zeros(len(clusterSizes))
@@ -452,9 +426,9 @@ def returnMapPlotter(rigFileList,numParticles):
         #Now that we have the relevant data for the return map.  We just throw out the last element and throw out the first element then concatenate together
         returnMapData = np.vstack([largestClusters[:-1],largestClusters[1:]]).transpose()
     
-        ax.plot(returnMapData[:,0],returnMapData[:,1],'o',color=colorList[bigCounter],label="$\sigma = $"+currentStress,alpha=0.5)
+        ax.plot(returnMapData[:,0],returnMapData[:,1],'o',color=colorList[colorCounter],label="$\sigma = $"+currentStress,alpha=0.5)
         
-        bigCounter = bigCounter+1
+        
         
     # Shrink current axis by 20%
     box = ax.get_position()
@@ -469,6 +443,103 @@ def returnMapPlotter(rigFileList,numParticles):
     return ax
             
 
+
+def viscosityVsRigidClusterPlotter(dataFileList,rigFileList,snapShotRange,maxClusterSize=False):
+    
+    #Let's pull out the needed rigid cluster data for each rig file
+    
+    medianDataHolder = np.zeros((len(rigFileList),2))
+    
+    counter = 0
+    for rigFile in rigFileList:
+        rigidClusterSizes,_ = rigidClusterProcessor.rigFileReader(rigFile,snapShotRange,False)
+        
+        result = re.search('_stress(.*)cl', rigFile)
+        currentStress = float(result.group(1))
+        
+        holder = np.array([])
+        for i in rigidClusterSizes:
+            if maxClusterSize == False:
+                holder = np.append(holder,i)
+            else:
+                holder = np.append(holder,np.max(i))
+        holder = holder[holder != 0]
+        medianClusterSize = np.median(holder)
+        
+        medianDataHolder[counter,0] = currentStress
+        medianDataHolder[counter,1] = medianClusterSize
+        counter=counter+1
+        
+    #Now let's get the viscosity
+    
+    viscosityDataHolder = np.zeros((len(dataFileList),2))
+    
+    counter = 0
+    stressList = []
+    for dataFile in dataFileList:
+        
+        
+        result = re.search('_stress(.*)cl', dataFile)
+        currentStress = float(result.group(1))
+        stressList.append(currentStress)
+        
+        
+        viscosityValues = rigidClusterProcessor.viscosityAverager(dataFile)
+         
+         
+        viscosityDataHolder[counter,0] = currentStress
+        viscosityDataHolder[counter,1] = np.mean(viscosityValues)
+         
+        counter=counter+1
+    
+    
+    
+    medianDataHolder = medianDataHolder[np.argsort(medianDataHolder[:, 0])]                                
+    viscosityDataHolder = viscosityDataHolder[np.argsort(viscosityDataHolder[:, 0])]
+    return stressList,viscosityDataHolder,medianDataHolder
+                                              
+                                              
+                                              
+    
+
+def rigidLengthDistPlotter3D(rigFileList,parFileList,listOfStresses,numParticles,snapShotRange,Lx,nBins=500,rotation=False):
+    fig = matplotlib.pyplot.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+
+    for rigFile, parFile, stress in zip(rigFileList, parFileList,listOfStresses):
+        
+        (xExtentHolder,_) = rigidClusterProcessor.rigidClusterLength(rigFile,parFile,numParticles,snapShotRange,rotation)
+        
+        allXExtents = np.array([])
+
+
+        for i in range(0,len(xExtentHolder)):
+            allXExtents = np.append(allXExtents,xExtentHolder[i])
+    
+        allXExtents = allXExtents/Lx
+        
+        hist, bin_edges = np.histogram(allXExtents,density=True,bins=nBins)
+        bin_edge_average =np.zeros(len(bin_edges)-1)
+        for i in range(0,len(bin_edges)-1):
+            bin_edge_average[i] = (bin_edges[i+1]+bin_edges[i])/2
+        
+    
+        
+        X = bin_edge_average
+        Z = hist
+        
+        
+        ax.bar(X, Z, zs=stress, zdir='y',width = bin_edges[1]-bin_edges[0])
+        
+    return (fig,ax)
+
+
+
+    
+    
+    
+    
     
     
     
