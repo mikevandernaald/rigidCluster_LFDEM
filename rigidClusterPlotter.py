@@ -69,7 +69,7 @@ def dataExtractorLFDEMPositionsRadii(parFile,intFile,snapShotRange=False):
     return positionData,particleRadii,systemSizeLx,systemSizeLz,snapShotRange
 
 
-def dataExtractorLFDEMBothForces(parFile,intFile,snapShotRange=False):
+def dataExtractorLFDEMAllForces(parFile,intFile,snapShotRange=False):
     
     
     with open(intFile) as fp:
@@ -135,30 +135,39 @@ def dataExtractorLFDEMBothForces(parFile,intFile,snapShotRange=False):
     #Now lets make a python list to store all the different contacts for each snapshot
     contactInfoFrictional = [0] * (upperSnapShotRange-lowerSnapShotRange)
     contactInfoHydro = [0] * (upperSnapShotRange-lowerSnapShotRange)
-
+    contactInfoFrictionless = [0] * (upperSnapShotRange-lowerSnapShotRange)
+    
     #Now we'll loop through each snapshot and store only the first three columns.  This should hopefully make this less expensive.
     #The first column is the first particle index, the second is the second particle index and the final column tells us the contact type.
     #We will also be ignoring any interaction where the contact type is 0 as that is a hydrodynamic interaction.
     counter = 0
     for i in range(lowerSnapShotRange,upperSnapShotRange):
         if i==numSnapshots-1:
-            currentContacts = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(numLines)),usecols=(0,1,2,3,5,7,8,10,11,12,14))
+            currentContacts = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(numLines)),usecols=(0,1,2,7,11))
         else:
-            currentContacts = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(linesWhereDataStarts[i + 1])),usecols=(0,1,2,3,5,7,8,10,11,12,14))
-            
-        magnitudeOfHydroForces = np.sqrt(currentContacts[:,5]**2+currentContacts[:,6]**2+currentContacts[:,7]**2)
-        magnitudeOfContactForces = np.sqrt(currentContacts[:,8]**2+currentContacts[:,9]**2+currentContacts[:,10]**2)
+            currentContacts = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(linesWhereDataStarts[i + 1])),usecols=(0,1,2,7,11))
+        
+        
+        np.ones(len(currentContacts[:,2]))*(currentContacts[:,2]==1) 
+        
+        magnitudeOfHydroForces = currentContacts[:,2]
+        magnitudeOfFrictionalForces = currentContacts[:,3]*np.ones(len(currentContacts[:,2]))*(currentContacts[:,2]>1) 
+        magnitudeOfFrictionlessForces = currentContacts[:,3]*np.ones(len(currentContacts[:,2]))*(currentContacts[:,2]==1) 
+        
+        
             
         if len(currentContacts)==0:
             contactInfoFrictional[counter] = 0
             contactInfoHydro[counter] = 0
+            contactInfoFrictionless[counter] = 0
         else:
-            contactInfoFrictional[counter] = np.concatenate((np.expand_dims(currentContacts[:,0], axis=1),np.expand_dims(currentContacts[:,1], axis=1),np.expand_dims(magnitudeOfContactForces, axis=1)),axis=1)
+            contactInfoFrictional[counter] = np.concatenate((np.expand_dims(currentContacts[:,0], axis=1),np.expand_dims(currentContacts[:,1], axis=1),np.expand_dims(magnitudeOfFrictionalForces, axis=1)),axis=1)
+            contactInfoFrictionless[counter] = np.concatenate((np.expand_dims(currentContacts[:,0], axis=1),np.expand_dims(currentContacts[:,1], axis=1),np.expand_dims(magnitudeOfFrictionlessForces, axis=1)),axis=1)
             contactInfoHydro[counter] = np.concatenate((np.expand_dims(currentContacts[:,0], axis=1),np.expand_dims(currentContacts[:,1], axis=1),np.expand_dims(magnitudeOfHydroForces, axis=1)),axis=1)
         del currentContacts
         counter=counter+1
     
-    return (contactInfoHydro,contactInfoFrictional,positionData,particleRadii,systemSizeLx,systemSizeLz,numParticles)
+    return (contactInfoHydro,contactInfoFrictional,contactInfoFrictionless,positionData,particleRadii,systemSizeLx,systemSizeLz,numParticles)
 
  
     
