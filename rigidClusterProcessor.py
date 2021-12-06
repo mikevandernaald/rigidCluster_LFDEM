@@ -9,6 +9,8 @@ import Analysis as AN
 import itertools
 import re
 from scipy.spatial.distance import pdist
+from os import listdir
+from os.path import isfile, join
 
 """
 Date:  2/5/2021
@@ -205,10 +207,6 @@ def rigidClusterDataGenerator(pebbleObj,returnClusterIDs=True):
         else:
             return clusterSizes,numBondsPerCluster
 
-    
-
-
-
 def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True):
     """
     This finds all par and int files in a directory and spits out their rigidcluster statistics
@@ -305,9 +303,7 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True):
                             
             
             
-            fp.close()
-            
-            
+            fp.close()            
     
 def rigFileReader(rigFile,snapShotRange=False,readInIDS=True):
     
@@ -376,26 +372,6 @@ def rigFileReader(rigFile,snapShotRange=False,readInIDS=True):
     else:
         return rigidClusterSizes,numBonds
     
-
-  
-
-def phiRigCalculator(rigFile,snapShotStartingPoint,numParticles,threshHold):
-    
-    (rigidClusterSizes,numBonds,clusterIDs) = rigFileReader(rigFile)
-    
-    largestClusters = np.zeros(len(rigidClusterSizes))
-    
-    counter=0
-    for currentClusterList in rigidClusterSizes:
-        largestClusters[counter] = np.max(currentClusterList)
-        counter=counter+1
-    
-    #If the value in the list is true then it is larger than the threshold size.
-    largestClusters = largestClusters[snapShotStartingPoint:]/numParticles >= threshHold
-    
-    return largestClusters
-    
-    
 def viscosityAverager(dataFile):
     #dataFile = r"C:\Users\mikev\Documents\data\rigidClusterData\data_D2N2000VF0.8Bidi1.4_0.5Square_1_pardata_phi0.8_stress100cl.dat"
     
@@ -414,11 +390,7 @@ def viscosityAverager(dataFile):
           
         counter=counter+1
     return viscosityHolder
-        
-    
-
-    
-    
+         
 def rigidClusterLength(rigFile,parFile,numParticles,Lx,Ly,snapShotRange=False,rotatePositions=False):
     
     #Load in position data
@@ -516,12 +488,89 @@ def rigidClusterLength(rigFile,parFile,numParticles,Lx,Ly,snapShotRange=False,ro
             
     return (xExtentHolder,yExtentHolder)
         
+def largestClusterCalc(rigFile,snapShotStartingPoint):
+    
+    (rigidClusterSizes,numBonds,clusterIDs) = rigFileReader(rigFile,[snapShotStartingPoint,-1])
+    
+    largestClusters = np.zeros(len(rigidClusterSizes))
+    
+    counter=0
+    for currentClusterList in rigidClusterSizes:
+        largestClusters[counter] = np.max(currentClusterList)
+        counter=counter+1
+    
+    #If the value in the list is true then it is larger than the threshold size.
+    
+    return largestClusters
 
+def phiRigCalc(topDir,sizeThreshold,percentageSnapShotThreshold):
+    
+    #helper functions
+    
+    def stepFunction(x):
+        if x >= sizeThreshold:
+            return 1
+        else:
+            return 0
+    
+    
+    listOfDirs = [os.path.join(topDir, o) for o in os.listdir(topDir) if os.path.isdir(os.path.join(topDir,o))]
+    listOfPhi = [float(listOfDirs[i][-4:].replace("F", "").replace("V", "")  ) for i in range(0,len(listOfDirs))]
 
     
+    percentageHolder = np.zeros(len(listOfPhi))
+    
+    #Now let's calculate the largest cluster for each phi
+    counter=0
+    for currentDir in listOfDirs:
+        #First we need to find the rig file for the highest stress
+        listOfFiles = [f for f in listdir(currentDir) if isfile(join(currentDir, f))]
+        listOfFiles = [f for f in listOfFiles if "stress100cl" in f]
+        currentRigFile = [f for f in listOfFiles if "rig_" in f][0]
+        
+        currentMaxClusterSizes = largestClusterCalc(os.path.join(currentDir,currentRigFile),50)
+        
+        if len(currentMaxClusterSizes)!=0:
+        
+            snapShotsAboveThreshold = [stepFunction(x) for x in currentMaxClusterSizes]
+                    
+            percentageHolder[counter] = (1/len(snapShotsAboveThreshold))*np.sum(snapShotsAboveThreshold)
+        else:
+            percentageHolder[counter] =np.nan
+            
+        counter=counter+1
+    
+    
+    percentageHolder = percentageHolder >= percentageSnapShotThreshold
+    
+    phiWithPercentage = np.vstack((percentageHolder,listOfPhi))
+    
+    
+    
+    if np.sum(phiWithPercentage[0,:]==1) ==0:
+        return np.nan
+    else: 
+        phiRig = listOfPhi[np.min(np.where(phiWithPercentage[0,:]==1))]
+        return phiRig
     
     
     
     
     
-    
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        
+        

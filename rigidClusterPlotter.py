@@ -44,9 +44,12 @@ def dataExtractorLFDEMPositionsRadii(parFile,intFile,snapShotRange=False):
         lowerSnapShotRange = 0
         upperSnapShotRange = numSnapshots
     else:
-        lowerSnapShotRange = snapShotRange[0]
-        upperSnapShotRange = snapShotRange[1]
-
+        if snapShotRange[1]==-1:
+            lowerSnapShotRange = snapShotRange[0]
+            upperSnapShotRange = numSnapshots
+        else:
+            lowerSnapShotRange = snapShotRange[0]
+            upperSnapShotRange = snapShotRange[1]
 
     #Extract the particle radii's
     particleRadii = positionData[:numParticles,0]
@@ -67,7 +70,6 @@ def dataExtractorLFDEMPositionsRadii(parFile,intFile,snapShotRange=False):
     #Now lets load in the particle contacts from intFile and ignore the header lines (first 25 lines).
     
     return positionData,particleRadii,systemSizeLx,systemSizeLz,snapShotRange
-
 
 def dataExtractorLFDEMAllForces(parFile,intFile,snapShotRange=False):
     
@@ -94,9 +96,12 @@ def dataExtractorLFDEMAllForces(parFile,intFile,snapShotRange=False):
         lowerSnapShotRange = 0
         upperSnapShotRange = numSnapshots
     else:
-        lowerSnapShotRange = snapShotRange[0]
-        upperSnapShotRange = snapShotRange[1]
-
+        if snapShotRange[1]==-1:
+            lowerSnapShotRange = snapShotRange[0]
+            upperSnapShotRange = numSnapshots
+        else:
+            lowerSnapShotRange = snapShotRange[0]
+            upperSnapShotRange = snapShotRange[1]
 
     #Extract the particle radii's
     particleRadii = positionData[:numParticles,0]
@@ -150,9 +155,9 @@ def dataExtractorLFDEMAllForces(parFile,intFile,snapShotRange=False):
         
         np.ones(len(currentContacts[:,2]))*(currentContacts[:,2]==1) 
         
-        magnitudeOfHydroForces = currentContacts[:,2]
-        magnitudeOfFrictionalForces = currentContacts[:,3]*np.ones(len(currentContacts[:,2]))*(currentContacts[:,2]>1) 
-        magnitudeOfFrictionlessForces = currentContacts[:,3]*np.ones(len(currentContacts[:,2]))*(currentContacts[:,2]==1) 
+        magnitudeOfHydroForces = currentContacts[:,3]
+        magnitudeOfFrictionalForces = currentContacts[:,4]*np.ones(len(currentContacts[:,2]))*(currentContacts[:,2]>1) 
+        magnitudeOfFrictionlessForces = currentContacts[:,4]*np.ones(len(currentContacts[:,2]))*(currentContacts[:,2]==1) 
         
         
             
@@ -169,16 +174,13 @@ def dataExtractorLFDEMAllForces(parFile,intFile,snapShotRange=False):
     
     return (contactInfoHydro,contactInfoFrictional,contactInfoFrictionless,positionData,particleRadii,systemSizeLx,systemSizeLz,numParticles)
 
- 
-    
-    
 def rigidClusterPlotGenerator(fileName,snapShot,parFile,intFile,rigFile,rigidClusterStrokeWidth):
     colorForCluster = matplotlib.colors.to_hex([0.085, 0.532, 0.201])
 
     #Load in the positions and radii and plot the packing
     (currentPosData,particleRadii,systemSizeLx,systemSizeLz,_) = dataExtractorLFDEMPositionsRadii(parFile,intFile,[snapShot,snapShot+1])
 
-    dwg = svgwrite.Drawing(fileName, size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
+    dwg = svgwrite.Drawing(size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
     
     currentPosData = currentPosData[:,:,0]
     
@@ -214,127 +216,18 @@ def rigidClusterPlotGenerator(fileName,snapShot,parFile,intFile,rigFile,rigidClu
                 
             
             
-    dwg.save()
-
-    
-
-    
-def generatePlots(topDir,parFile,intFile,snapShot,scalarFrictionalForces,scalarHydroForces,rigidClusterStrokeWidth,name):
-    
-    
-    topDirRigidCluster = os.path.join(topDir,"rigidClusters")
-    topDirHydro = os.path.join(topDir,"hydroForces")
-    topDirFrictional = os.path.join(topDir,"frictionalForces")
-    
-    
-    fileNameRigid = os.path.join(topDirRigidCluster,name+"rigidCluster.svg")
-    #fileNameForces= os.path.join(topDir,name+"forces.svg")
-    
-    (contactInfoHydro,contactInfoFrictional,positionData,particleRadii,systemSizeLx,systemSizeLz,numParticles) = dataExtractorLFDEMBothForces(parFile,intFile,[snapShot,snapShot+1])
-
-
-    (clusterHolder,ThisPebble,ThisConf) = rigidClusterProcessor.pebbleGame_LFDEMSnapshot(parFile,intFile,False,[snapShot,snapShot+1])
-    ThisHessian = HS.Hessian(ThisConf)
-
-    ThisAnalysis = AN.Analysis(ThisConf, ThisPebble, ThisHessian, 0.01, False)
-    
-    
-    
-    frictionalAndHydroForcePlotter(topDirHydro,topDirFrictional,name,particleRadii,positionData[:,:,0],contactInfoHydro[0][:,:2],contactInfoFrictional[0][:,2],contactInfoHydro[0][:,2],systemSizeLx,systemSizeLz,5,scalarFrictionalForces,scalarHydroForces)
-    
-
-    rigidClusterPlotter(fileNameRigid,positionData[:,:,0],particleRadii,systemSizeLx,systemSizeLz,ThisConf,ThisPebble,ThisAnalysis,rigidClusterStrokeWidth)
-
-
-def rigidCluserMovieMaker(topDir,parFile,intFile,scalarFrictionalForces,scalarHydroForces,rigidClusterStrokeWidth,snapShotRange=False):
-    os.mkdir(os.path.join(topDir,"rigidClusters"))
-    os.mkdir(os.path.join(topDir,"hydroForces"))
-    os.mkdir(os.path.join(topDir,"frictionalForces"))
-    
-    topDirRigidCluster = os.path.join(topDir,"rigidClusters")
-    topDirHydro = os.path.join(topDir,"hydroForces")
-    topDirFrictional = os.path.join(topDir,"frictionalForces")
-    
-    (contactInfoHydro,contactInfoFrictional,positionData,particleRadii,systemSizeLx,systemSizeLz,numParticles) = dataExtractorLFDEMBothForces(parFile,intFile,snapShotRange)
-    clusterHolder= rigidClusterProcessor.pebbleGame_LFDEMSnapshot(parFile,intFile,False,snapShotRange)
-
-    print("Done computing rigid cluster information.  Starting movie making..")
-    if snapShotRange == False:
-        snapShots = np.linspace(0, len(clusterHolder), len(clusterHolder) + 1)
-    else:
-        snapShots = np.linspace(snapShotRange[0], snapShotRange[1], snapShotRange[1] - snapShotRange[0])
-
-    counter=0
-    for i in snapShots:
-        fileName = os.path.join(topDir,str(i))
-        
-        fileNameRigid = os.path.join(topDirRigidCluster,str(i)+"_rigidCluster.svg")
-
-        ThisPebble = clusterHolder[int(counter)][5]
-        ThisConf = clusterHolder[int(counter)][6]
-        ThisHessian = HS.Hessian(ThisConf)
-        ThisAnalysis = AN.Analysis(ThisConf, ThisPebble, ThisHessian, 0.01, False)
-        
-        positionData[:,1,int(counter)] = positionData[:,1,int(counter)] + 11*systemSizeLx/20
-        positionData[:,0,int(counter)] = positionData[:,0,int(counter)] + 11*systemSizeLx/20
-        
-        frictionalAndHydroForcePlotter(topDirHydro,topDirFrictional,fileName,particleRadii,positionData[:,:,int(counter)],contactInfoHydro[int(counter)][:,:2],contactInfoFrictional[int(counter)][:,2],contactInfoHydro[int(counter)][:,2],systemSizeLx,systemSizeLz,5,scalarFrictionalForces,scalarHydroForces)
-        rigidClusterPlotter(fileNameRigid,positionData[:,:,int(counter)],particleRadii,systemSizeLx,systemSizeLz,ThisConf,ThisPebble,ThisAnalysis,rigidClusterStrokeWidth)
-        counter=counter+1
-        
-        
-def rigidClusterMovieComposer(hydroDir,frictionalDir,rigidClusterDir,outputDir):
-    
-    
-    hydroFiles = os.listdir(hydroDir)
-    frictionalFiles = os.listdir(frictionalDir)
-    rigidClusterFiles = os.listdir(rigidClusterDir)
-    
-    
-    
-    for i in range(0,len(frictionalFiles)):
-        
-        currentHydroFile = os.path.join(hydroDir,hydroFiles[i])
-        currentFricitonalFile = os.path.join(frictionalDir,frictionalFiles[i])
-        currentRigidClusterFile = os.path.join(rigidClusterDir,rigidClusterFiles[i])
-        
-        images = [Image.open(x) for x in [currentHydroFile, currentFricitonalFile, currentRigidClusterFile]]
-        widths, heights = zip(*(i.size for i in images))
-        
-        total_width = sum(widths)
-        max_height = max(heights)
-        
-        new_im = Image.new('RGB', (total_width, max_height))
-        
-
-        
-        x_offset = 0
-        for im in images:
-          new_im.paste(im, (x_offset,0))
-          x_offset += im.size[0]
-        
-        
-        
-        rgba = np.array(new_im)
-
-        # Make image transparent white anywhere it is transparent
-        rgba[rgba[...,-1]==0] = [255,255,255]
-        
-        
-        Image.fromarray(rgba).save(os.path.join(outputDir,str(i)+".png"))
-
-
-
+    dwg.saveas(fileName)
+   
 def forcePlotter(positions,radii,forces,systemSizeLx,systemSizeLz,forceScalar=1,outputFile=False,inputDwg=False,forceColor="red",threshold=5):
     
   
-    if outputFile==False:
-        svgFile = svgwrite.Drawing(size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
-    else: 
-        svgFile = svgwrite.Drawing(outputFile, size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
+
+
     
     if inputDwg != False:
         svgFile = inputDwg
+    else:
+        svgFile = svgwrite.Drawing(size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
     
     
     #rescale magnitudes
@@ -342,10 +235,11 @@ def forcePlotter(positions,radii,forces,systemSizeLx,systemSizeLz,forceScalar=1,
     #Get the particle ids of relevant particles
     contactingPairs = forces[:,:2]
     
-
+        
+    
+    xPos = positions[:,0] + 11*systemSizeLx/20
+    yPos = positions[:,1] + 11*systemSizeLz/20
     if inputDwg == False:
-        xPos = positions[:,0]
-        yPos = positions[:,1]
         #First plot all the circles
         #breakpoint()
         for i in range(0,len(radii)):
@@ -365,22 +259,19 @@ def forcePlotter(positions,radii,forces,systemSizeLx,systemSizeLz,forceScalar=1,
         xPos2 = xPos[int(secondParticleIndex)]
         yPos2 = yPos[int(secondParticleIndex)]
         
-        forceMag = forceMagnitudes[i]
+        forceMag = abs(forceMagnitudes[i][0])
         
         if ((xPos1-xPos2)**2 + (yPos1-yPos2)**2 < systemSizeLx/threshold):
             if forceMag != 0:
                 svgFile.add(svgwrite.shapes.Line(start=(xPos1, yPos1), end=(xPos2, yPos2),stroke_width=forceMag,stroke=forceColor,))
                 
-        if outputFile==False:
-            return svgFile
-        else:
-            svgFile.save()  
-            return svgFile
+    if outputFile==False:
+        return svgFile
+    else:
+        svgFile.saveas(outputFile)  
+        return svgFile
         
-        
-
-
-def returnMapPlotter(rigFileList,numParticles):
+def returnMapPlotter(rigFileList,numParticles,shift=1,savePlot=False):
     """
     This function takes in a list of paths to different rig_ files and then makes the return maps plots for them.
     
@@ -394,7 +285,7 @@ def returnMapPlotter(rigFileList,numParticles):
     f, ax = matplotlib.pyplot.subplots(figsize=(width,height))
     
     ax.set_xlabel("$S_{max,\gamma}$",fontsize=25)
-    ax.set_ylabel("$S_{max,\gamma+1}$",fontsize=25)
+    ax.set_ylabel("$S_{max,\gamma+\delta}$, $\delta=$"+str(shift),fontsize=25)
     ax.set_ylim(0,numParticles)
     ax.set_xlim(0,numParticles)
     colorList = ["blue","orange","green","red","purple","brown","olive","cyan","black","lawngreen","indigo"]
@@ -431,9 +322,15 @@ def returnMapPlotter(rigFileList,numParticles):
             largestClusters[counter] = np.max(currentClusterList)
             counter=counter+1
 
+        
 
+        #Now let's generate the return map with the correct shift.
+        intialClusters = largestClusters[:-shift]
+        finalClusters = largestClusters[shift:]
+
+        
         #Now that we have the relevant data for the return map.  We just throw out the last element and throw out the first element then concatenate together
-        returnMapData = np.vstack([largestClusters[:-1],largestClusters[1:]]).transpose()
+        returnMapData = np.vstack([intialClusters,finalClusters]).transpose()
     
         ax.plot(returnMapData[:,0],returnMapData[:,1],'o',color=colorList[colorCounter],label="$\sigma = $"+currentStress,alpha=0.5)
         
@@ -449,10 +346,11 @@ def returnMapPlotter(rigFileList,numParticles):
     matplotlib.pyplot.tight_layout()
     matplotlib.pyplot.grid()
     
+    if savePlot!=False:
+        matplotlib.pyplot.savefig(savePlot)
+    
     return ax
             
-
-
 def viscosityVsRigidClusterPlotter(dataFileList,rigFileList,snapShotRange,maxClusterSize=False):
     
     #Let's pull out the needed rigid cluster data for each rig file
@@ -507,10 +405,6 @@ def viscosityVsRigidClusterPlotter(dataFileList,rigFileList,snapShotRange,maxClu
     viscosityDataHolder = viscosityDataHolder[np.argsort(viscosityDataHolder[:, 0])]
     return stressList,viscosityDataHolder,medianDataHolder
                                               
-                                              
-                                              
-    
-
 def rigidLengthDistPlotter3D(rigFileList,parFileList,listOfStresses,numParticles,snapShotRange,Lx,nBins=500,rotation=False):
     fig = matplotlib.pyplot.figure()
     ax = fig.add_subplot(111, projection='3d')
@@ -543,6 +437,14 @@ def rigidLengthDistPlotter3D(rigFileList,parFileList,listOfStresses,numParticles
         
     return (fig,ax)
 
+
+def rigidClusterSizeDist3D(rigFileList):
+    
+    fig = matplotlib.pyplot.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    
+    
+    
 
 
     
