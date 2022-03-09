@@ -11,6 +11,9 @@
 
 # Needs a configuration to start with
 from Configuration_LFDEM import *
+import sys
+sys.setrecursionlimit(15000000000000)
+
 
 # Copy function as we need to make non-trivial copies of whole pebble configurations
 import copy as cp

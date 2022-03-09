@@ -16,6 +16,9 @@ from numpy import linalg as LA
 # Some amount of plotting library
 import matplotlib.pyplot as plt
 import matplotlib
+import sys
+sys.setrecursionlimit(15000000000000)
+
 #matplotlib.rcParams['text.usetex'] = 'true'
 matplotlib.rcParams['lines.linewidth'] = 4
 matplotlib.rcParams['axes.linewidth'] = 2

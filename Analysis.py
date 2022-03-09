@@ -34,6 +34,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as ptch
 import matplotlib.lines as lne
 from matplotlib.colors import LinearSegmentedColormap
+sys.setrecursionlimit(15000000000000)
+
 
 #import matplotlib
 #matplotlib.rcParams['text.usetex'] = 'true'

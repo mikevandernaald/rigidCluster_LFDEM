@@ -11,6 +11,7 @@ import re
 from scipy.spatial.distance import pdist
 from os import listdir
 from os.path import isfile, join
+sys.setrecursionlimit(15000000000000)
 
 """
 Date:  2/5/2021
@@ -552,25 +553,41 @@ def phiRigCalc(topDir,sizeThreshold,percentageSnapShotThreshold):
     else: 
         phiRig = listOfPhi[np.min(np.where(phiWithPercentage[0,:]==1))]
         return phiRig
+     
+def phiRigCalcFuncStress(topDir,sizeThreshold,percentageSnapShotThreshold,snapShotStartingPoint):
     
+    #helper functions
+    def stepFunction(x):
+        if x >= sizeThreshold:
+            return 1
+        else:
+            return 0
     
+    rigFiles =  [f for f in listdir(topDir) if isfile(join(topDir, f)) and "rig_" in f]
+    rigFiles = [os.path.join(topDir,file) for file in rigFiles]
     
+    #The firsrt column is whether or not the max cluster was found and second column is stress and t
+    percentageHolder = np.zeros((len(rigFiles),3))
     
-    
+    #Now lets calcualte phiRig for each stress
+    counter=0
+    for currentRigFile in rigFiles:
         
+        currentStress = float(re.search('_stress(.*)cl', currentRigFile).group(1))
+        percentageHolder[counter,0] = currentStress
         
+        currentMaxClusterSizes = largestClusterCalc(currentRigFile,snapShotStartingPoint)
+        percentageHolder[counter,2] = len(currentMaxClusterSizes)
+        print(len(currentMaxClusterSizes))
         
+        if len(currentMaxClusterSizes)!=0:
+            snapShotsAboveThreshold = [stepFunction(x) for x in currentMaxClusterSizes]
+                    
+            percentageHolder[counter,1] = (1/len(snapShotsAboveThreshold))*np.sum(snapShotsAboveThreshold) >= percentageSnapShotThreshold
+        else:
+            percentageHolder[counter,1] =np.nan
+            
+        counter=counter+1
         
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+    return np.sort(percentageHolder,0)
+

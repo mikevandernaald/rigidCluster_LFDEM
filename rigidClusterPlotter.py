@@ -14,8 +14,9 @@ import Hessian as HS
 import Analysis as AN
 import matplotlib
 import re
-
+import matplotlib.ticker as mticker
 from PIL import Image
+sys.setrecursionlimit(15000000000000)
 
 
 
@@ -181,6 +182,7 @@ def rigidClusterPlotGenerator(fileName,snapShot,parFile,intFile,rigFile,rigidClu
     (currentPosData,particleRadii,systemSizeLx,systemSizeLz,_) = dataExtractorLFDEMPositionsRadii(parFile,intFile,[snapShot,snapShot+1])
 
     dwg = svgwrite.Drawing(size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
+    dwg.add(dwg.rect(insert=(0, 0), size=('100%', '100%'), rx=None, ry=None, fill='rgb(255,255,255)'))
     
     currentPosData = currentPosData[:,:,0]
     
@@ -196,23 +198,24 @@ def rigidClusterPlotGenerator(fileName,snapShot,parFile,intFile,rigFile,rigidClu
     #Load in the rigidCluster IDs for the packing
     (_,_,clusterIDs)=rigidClusterProcessor.rigFileReader(rigFile,[snapShot,snapShot+1])
 
-
     #Loop through all the clusters and plot them on the previous SVG object
     for clusters in clusterIDs[0]:
-        
-        (numContactsInCluster,_) = np.shape(clusters)
-        
-        for i in range(0,numContactsInCluster):
-            particleI = int(clusters[i,0])
-            particleJ = int(clusters[i,1])
+        if len(clusters)==1:
+            print("fuck")
+        else:
+            numContactsInCluster = np.shape(clusters)[0]
             
-            x0 = currentPosData[particleI,0] + 11 * systemSizeLx / 20
-            y0 = currentPosData[particleI,1] + 11 * systemSizeLz / 20
-            
-            x1 = currentPosData[particleJ,0] + 11 * systemSizeLx / 20
-            y1 = currentPosData[particleJ,1] + 11 * systemSizeLz / 20
-            if (x0-x1)**2 + (y0-y1)**2 < systemSizeLx/5:
-                dwg.add(svgwrite.shapes.Line(start=(x0, y0), end=(x1, y1),stroke_width=rigidClusterStrokeWidth,stroke=colorForCluster,))
+            for i in range(0,numContactsInCluster):
+                particleI = int(clusters[i,0])
+                particleJ = int(clusters[i,1])
+                
+                x0 = currentPosData[particleI,0] + 11 * systemSizeLx / 20
+                y0 = currentPosData[particleI,1] + 11 * systemSizeLz / 20
+                
+                x1 = currentPosData[particleJ,0] + 11 * systemSizeLx / 20
+                y1 = currentPosData[particleJ,1] + 11 * systemSizeLz / 20
+                if (x0-x1)**2 + (y0-y1)**2 < systemSizeLx/5:
+                    dwg.add(svgwrite.shapes.Line(start=(x0, y0), end=(x1, y1),stroke_width=rigidClusterStrokeWidth,stroke=colorForCluster,))
                 
             
             
@@ -437,14 +440,102 @@ def rigidLengthDistPlotter3D(rigFileList,parFileList,listOfStresses,numParticles
         
     return (fig,ax)
 
-
-def rigidClusterSizeDist3D(rigFileList):
+def rigidClusterSizeDist3D(rigFileList,snapShotRange,nBins,uniqueValues=True):
     
     fig = matplotlib.pyplot.figure()
     ax = fig.add_subplot(111, projection='3d')
     
     
+    def log_tick_formatter(val, pos=None):
+        return "{:.2e}".format(10**val)
     
+    for rigFile in rigFileList:
+        
+        #Read in the rigid cluster sizes for each snapshot
+        rigidClusterSizes,_ = rigidClusterProcessor.rigFileReader(rigFile,snapShotRange,False)
+        
+        
+        #Use regular expressions to get the stress that the rigFile corresponds to
+        result = re.search('_stress(.*)cl', rigFile)
+        currentStress = float(result.group(1))
+        
+        
+        #Let's put all of the arrays in rigidClusterSizes into one big array.
+        allClusters = np.array([])
+        for i in range(0,len(rigidClusterSizes)):
+            
+            if uniqueValues==True:
+                allClusters = np.append(allClusters,np.unique(rigidClusterSizes[i]))
+            else:
+                allClusters = np.append(allClusters,rigidClusterSizes[i])
+        
+        #Now we copmute the histogram of the data.
+        hist, bin_edges = np.histogram(allClusters,bins=nBins)
+        
+        #The histogram return variable bin_edges has one more entry than hist which will be problematic when plotting.
+        #To fix this and also get the correct x-axis for "size of cluster" we will take the averages
+        bin_edge_average =np.zeros(len(bin_edges)-1)
+        for i in range(0,len(bin_edges)-1):
+            bin_edge_average[i] = (bin_edges[i+1]+bin_edges[i])/2
+        
+        
+        
+        #Now we'll plot this particular stress in the 3D histogram
+        X = bin_edge_average
+        Z = hist/len(rigidClusterSizes)
+        ax.bar(X, Z, zs=np.log10(currentStress), zdir='y',width = bin_edges[1]-bin_edges[0],label="$\sigma = $"+str(currentStress))
+    
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(log_tick_formatter))
+    ax.legend()
+    
+    return (fig,ax)
+
+def rigidClusterSizeDist2D(rigFileList,snapShotRange,nBins,sMax=True):
+    
+    matplotlib.pyplot.clf()
+    
+    
+    for rigFile in rigFileList:            
+        #Read in the rigid cluster sizes for each snapshot
+        rigidClusterSizes,_ = rigidClusterProcessor.rigFileReader(rigFile,snapShotRange,False)
+        
+        
+        #Use regular expressions to get the stress that the rigFile corresponds to
+        result = re.search('_stress(.*)cl', rigFile)
+        currentStress = float(result.group(1))
+        
+        
+        #Let's put all of the arrays in rigidClusterSizes into one big array.
+        allClusters = np.array([])
+        for i in range(0,len(rigidClusterSizes)):
+            
+            if sMax==True:
+                allClusters = np.append(allClusters,np.max(rigidClusterSizes[i]))
+            else:
+                allClusters = np.append(allClusters,rigidClusterSizes[i])
+            
+        
+        #Now we copmute the histogram of the data.
+        kwargs = dict( alpha=0.3, bins=nBins,label="$\sigma = $"+str(currentStress),density=True)
+
+
+        matplotlib.pyplot.hist(allClusters, **kwargs)
+        
+        
+        
+    matplotlib.pyplot.legend()
+    matplotlib.pyplot.xlabel("Size of Cluster $S$")
+    if sMax==True:
+        matplotlib.pyplot.ylabel("$P(S_{max})$")
+    else:
+        matplotlib.pyplot.ylabel("$P(S)$")
+    matplotlib.pyplot.xlim((2,2000))
+    #matplotlib.pyplot.ylim((0,15))
+    matplotlib.pyplot.yscale("log")
+    matplotlib.pyplot.xscale("log")
+
+
+
 
 
     
