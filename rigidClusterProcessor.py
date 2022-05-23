@@ -11,7 +11,7 @@ import re
 from scipy.spatial.distance import pdist
 from os import listdir
 from os.path import isfile, join
-sys.setrecursionlimit(15000000000000)
+sys.setrecursionlimit(1500000)
 
 """
 Date:  2/5/2021
@@ -208,7 +208,7 @@ def rigidClusterDataGenerator(pebbleObj,returnClusterIDs=True):
         else:
             return clusterSizes,numBondsPerCluster
 
-def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True):
+def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressControlled=True):
     """
     This finds all par and int files in a directory and spits out their rigidcluster statistics
     into a rig_ file
@@ -227,10 +227,14 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True):
             
             
     for currentFile in parFiles:
-        result = re.search('_stress(.*)cl', currentFile)
-        currentStress = result.group(1)
-        
-        
+        if stressControlled==True:
+            result = re.search('_stress(.*)cl', currentFile)
+            currentStress = result.group(1)
+            correspondingIntFile = [i for i in intFiles if '_stress'+currentStress+'cl' in i]
+        else:
+            result = re.search('_rate(.*)cl', currentFile)
+            currentRate = result.group(1)
+            correspondingIntFile = [i for i in intFiles if '_rate'+currentRate+'cl' in i]
         
         correspondingIntFile = [i for i in intFiles if '_stress'+currentStress+'cl' in i]
         
@@ -503,6 +507,17 @@ def largestClusterCalc(rigFile,snapShotStartingPoint):
     #If the value in the list is true then it is larger than the threshold size.
     
     return largestClusters
+
+def allClusterCalc(rigFile,snapShotStartingPoint):
+    
+    (rigidClusterSizes,numBonds,clusterIDs) = rigFileReader(rigFile,[snapShotStartingPoint,-1])
+    
+    allClusters = np.array([])
+    
+    for currentClusterList in rigidClusterSizes:
+        allClusters = np.concatenate((allClusters,currentClusterList))
+
+    return allClusters
 
 def phiRigCalc(topDir,sizeThreshold,percentageSnapShotThreshold):
     

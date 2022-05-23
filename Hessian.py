@@ -17,7 +17,7 @@ from numpy import linalg as LA
 import matplotlib.pyplot as plt
 import matplotlib
 import sys
-sys.setrecursionlimit(15000000000000)
+sys.setrecursionlimit(1500000)
 
 #matplotlib.rcParams['text.usetex'] = 'true'
 matplotlib.rcParams['lines.linewidth'] = 4

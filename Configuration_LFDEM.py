@@ -16,7 +16,7 @@ as arguments to the class constructor.  This is nice for feeding in dense suspen
 
 import sys, os, glob
 import numpy as np
-sys.setrecursionlimit(15000000000000)
+sys.setrecursionlimit(1500000)
 
 
 class Configuration:

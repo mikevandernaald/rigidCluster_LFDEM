@@ -16,7 +16,9 @@ import matplotlib
 import re
 import matplotlib.ticker as mticker
 from PIL import Image
-sys.setrecursionlimit(15000000000000)
+import sys
+sys.setrecursionlimit(1500000)
+
 
 
 
