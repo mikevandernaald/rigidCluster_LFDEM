@@ -235,9 +235,7 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressC
             result = re.search('_rate(.*)cl', currentFile)
             currentRate = result.group(1)
             correspondingIntFile = [i for i in intFiles if '_rate'+currentRate+'cl' in i]
-        
-        correspondingIntFile = [i for i in intFiles if '_stress'+currentStress+'cl' in i]
-        
+                
         currentIntFile = os.path.join(topDir,correspondingIntFile[0])
         currentParFile = os.path.join(topDir,currentFile)
         
