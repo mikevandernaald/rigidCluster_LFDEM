@@ -23,6 +23,32 @@ Link to LF_DEM Github: https://github.com/ryseto/LF_DEM
 
 Link to Silke's Rigid Cluster Github: https://github.com/silkehenkes/RigidLibrary
 
+
+NOTE:  IN IT'S CURRENT FORM THESE FUNCTIONS ONLY WORK ON TWO DIMENSIONAL LF_DEM
+DATA THAT USES THE CRITICAL LOAD MODEL (I.E. HYDRODYNAMICS+REPULSIVE CONTACT FORCE+COULOMBIC FRICTION)
+
+
+There are three essential functions that will allow one to calulate rigid cluster statistics from 2D LF_DEM data.
+
+
+The first function "pebbleGame_LFDEMSnapshot" takes in a parFile and an intFile from LF_DEM data and outputs 
+outputs cluster sizes, number of bonds in a cluster, and optionally all of the particle IDS in each cluster 
+as well as the Pebble object that Silke's code uses.'
+
+The second function is "rigFileGenerator" which takes in a topDir where it looks for par_ and int_ files to process. 
+It also takes "outputDir" which is the directory where it dumps the processed rig_ files.  The optional argument snapShotRange
+determines which simulation snapshots are processed.  The optional argument "reportIDs" is set to True meaning that the rig_ files
+will have the particle IDs for each cluster, setting this to False will increase the runtime substantially and is useful if you only care about 
+cluster size statistics.  The optional argument "stressControlled" sets whether or not the function will look for stress controlled simulations (True)
+or rate controlled simulations (False)
+
+The third function "rigFileReader" reads in a particular rigFile given the path to the output rigFile.  snapShotRange sets which snapshots are read from the 
+rig file with the default being all snap shots.  Finally readInIDs sets whether or not the function will try to read in the particle IDs from the rig file which 
+increases the runtime quite a bit.
+
+The remaining functions are just helper functions that I (mike van der Naald) cobbled together to analyze and process rig_ files or other LF_DEM data.  If one 
+looks interesting to you go ahead and email me (mikevandernaald@gmail.com) and I can try to add some comments to it.
+
 To run on the cluster just use the following code to point the Python interpreter to where you keep this code:
 import sys
 sys.path.append('/home/mrv/pebbleCode/rigidCluster_LFDEM')
@@ -44,6 +70,49 @@ def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False,returnPebbleIDa
 
 
     """
+    
+    
+    def rigidClusterDataGenerator(pebbleObj,returnClusterIDs=True):
+        
+        """
+        This is a helper function that returns the rigid cluster properties from a pebbleObj which is constructed later in the function.
+        """
+    
+        #Load in all the relevant data.  The first column has the ID of the cluster and the second and third rows tell you the particles i and j which are in that cluster ID
+        clusterIDHolder = np.transpose(np.vstack([pebbleObj.cluster,pebbleObj.Ifull,pebbleObj.Jfull]))
+        
+        
+        #Remove all rows that have -1 in the first column.  Those are contacts that are not participating in a cluster
+        clusterIDHolder = clusterIDHolder[clusterIDHolder[:,0] != -1]
+        
+        numClusters = len(np.unique(clusterIDHolder[:,0]))
+        
+        clusterSizes = np.zeros(numClusters)
+        numBondsPerCluster = np.zeros(numClusters)
+        if returnClusterIDs == True:
+            clusterID = [0]*numClusters
+        
+        counter = 0
+        for i in np.unique(clusterIDHolder[:,0]):
+            currentCluster = clusterIDHolder[clusterIDHolder[:,0]==i][:,1:]
+            
+            currentCluster = np.unique(np.sort(currentCluster,axis=1), axis=0)
+        
+            (numBonds,_) = np.shape(currentCluster)
+            
+            
+            numBondsPerCluster[counter] = numBonds
+            clusterSizes[counter] = len(np.unique(currentCluster.flatten()))
+            if len(np.unique(currentCluster.flatten())) == 0:
+                breakpoint()
+            if returnClusterIDs == True:
+                clusterID[counter] = currentCluster
+            
+            counter=counter+1
+        if returnClusterIDs == True:
+            return clusterSizes,numBondsPerCluster,clusterID
+        else:
+            return clusterSizes,numBondsPerCluster
     
 
     
@@ -169,44 +238,6 @@ def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False,returnPebbleIDa
                     clusterHolder[counter] = [ clusterSizes, numBondsPerCluster]
         counter=counter+1
     return clusterHolder
-
-def rigidClusterDataGenerator(pebbleObj,returnClusterIDs=True):
-    
-        #Load in all the relevant data.  The first column has the ID of the cluster and the second and third rows tell you the particles i and j which are in that cluster ID
-        clusterIDHolder = np.transpose(np.vstack([pebbleObj.cluster,pebbleObj.Ifull,pebbleObj.Jfull]))
-        
-        
-        #Remove all rows that have -1 in the first column.  Those are contacts that are not participating in a cluster
-        clusterIDHolder = clusterIDHolder[clusterIDHolder[:,0] != -1]
-        
-        numClusters = len(np.unique(clusterIDHolder[:,0]))
-        
-        clusterSizes = np.zeros(numClusters)
-        numBondsPerCluster = np.zeros(numClusters)
-        if returnClusterIDs == True:
-            clusterID = [0]*numClusters
-        
-        counter = 0
-        for i in np.unique(clusterIDHolder[:,0]):
-            currentCluster = clusterIDHolder[clusterIDHolder[:,0]==i][:,1:]
-            
-            currentCluster = np.unique(np.sort(currentCluster,axis=1), axis=0)
-        
-            (numBonds,_) = np.shape(currentCluster)
-            
-            
-            numBondsPerCluster[counter] = numBonds
-            clusterSizes[counter] = len(np.unique(currentCluster.flatten()))
-            if len(np.unique(currentCluster.flatten())) == 0:
-                breakpoint()
-            if returnClusterIDs == True:
-                clusterID[counter] = currentCluster
-            
-            counter=counter+1
-        if returnClusterIDs == True:
-            return clusterSizes,numBondsPerCluster,clusterID
-        else:
-            return clusterSizes,numBondsPerCluster
 
 def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressControlled=True):
     """
@@ -491,7 +522,7 @@ def rigidClusterLength(rigFile,parFile,numParticles,Lx,Ly,snapShotRange=False,ro
             
     return (xExtentHolder,yExtentHolder)
         
-def largestClusterCalc(rigFile,snapShotStartingPoint):
+def largestClusterCalc(rigFile,snapShotStartingPoint,maximum=True):
     
     (rigidClusterSizes,numBonds,clusterIDs) = rigFileReader(rigFile,[snapShotStartingPoint,-1])
     
@@ -499,7 +530,10 @@ def largestClusterCalc(rigFile,snapShotStartingPoint):
     
     counter=0
     for currentClusterList in rigidClusterSizes:
-        largestClusters[counter] = np.max(currentClusterList)
+        if maximum==True:
+            largestClusters[counter] = np.max(currentClusterList)
+        else:
+            largestClusters[counter] = currentClusterList
         counter=counter+1
     
     #If the value in the list is true then it is larger than the threshold size.
@@ -604,3 +638,23 @@ def phiRigCalcFuncStress(topDir,sizeThreshold,percentageSnapShotThreshold,snapSh
         
     return np.sort(percentageHolder,0)
 
+def intFileStrainReader(intFile):
+    
+    
+    #Now lets load in the particle contacts from intFile and ignore the header lines (first 25 lines).
+    with open(intFile) as f1:
+        fileLines = f1.readlines()[24:]
+    
+    strainList = []
+    for lines in fileLines:
+        if "#" in lines:
+            floats_list = []
+            for item in str(lines[1:]).split():
+                floats_list.append(float(item))
+            strainList.append(floats_list[2])
+            
+    return np.array(strainList)
+
+            
+        
+    

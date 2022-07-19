@@ -184,7 +184,6 @@ def rigidClusterPlotGenerator(fileName,snapShot,parFile,intFile,rigFile,rigidClu
     (currentPosData,particleRadii,systemSizeLx,systemSizeLz,_) = dataExtractorLFDEMPositionsRadii(parFile,intFile,[snapShot,snapShot+1])
 
     dwg = svgwrite.Drawing(size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
-    dwg.add(dwg.rect(insert=(0, 0), size=('100%', '100%'), rx=None, ry=None, fill='rgb(255,255,255)'))
     
     currentPosData = currentPosData[:,:,0]
     
@@ -193,7 +192,7 @@ def rigidClusterPlotGenerator(fileName,snapShot,parFile,intFile,rigFile,rigidClu
     #First plot all the circles
     numParticles = len(particleRadii)
     for i in range(0,numParticles):
-        dwg.add(svgwrite.shapes.Circle(center=(xPos[i], yPos[i]), r=particleRadii[i],fill='white',stroke='black',stroke_width=.1,))
+        dwg.add(svgwrite.shapes.Circle(center=(xPos[i], yPos[i]), r=particleRadii[i],stroke='black',stroke_width=.1,fill="none",))
 
     
 
@@ -225,10 +224,6 @@ def rigidClusterPlotGenerator(fileName,snapShot,parFile,intFile,rigFile,rigidClu
    
 def forcePlotter(positions,radii,forces,systemSizeLx,systemSizeLz,forceScalar=1,outputFile=False,inputDwg=False,forceColor="red",threshold=5):
     
-  
-
-
-    
     if inputDwg != False:
         svgFile = inputDwg
     else:
@@ -248,7 +243,7 @@ def forcePlotter(positions,radii,forces,systemSizeLx,systemSizeLz,forceScalar=1,
         #First plot all the circles
         #breakpoint()
         for i in range(0,len(radii)):
-            svgFile.add(svgwrite.shapes.Circle(center=(xPos[i], yPos[i]), r=radii[i],fill='white',stroke='black',stroke_width=.1,))
+            svgFile.add(svgwrite.shapes.Circle(center=(xPos[i], yPos[i]), r=radii[i],stroke='black',stroke_width=.1,fill="none",))
             
     #Next plot all the frictional forces in red and the hydrodynamic forces in blue
     
