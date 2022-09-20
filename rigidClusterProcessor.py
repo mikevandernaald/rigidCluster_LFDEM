@@ -239,7 +239,7 @@ def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False,returnPebbleIDa
         counter=counter+1
     return clusterHolder
 
-def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressControlled=True):
+def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressControlled=True,stressRange=False):
     """
     This finds all par and int files in a directory and spits out their rigidcluster statistics
     into a rig_ file
@@ -270,6 +270,13 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressC
         currentIntFile = os.path.join(topDir,correspondingIntFile[0])
         currentParFile = os.path.join(topDir,currentFile)
         
+        
+        if stressRange!=False:
+            if stressRange[0] <= float(currentStress) <= stressRange[1]:
+                print("We're currently processing the stress: " + currentStress )
+            else:
+                break
+            
         
         currentClusterInfo = pebbleGame_LFDEMSnapshot(currentParFile,currentIntFile,snapShotRange)
         
@@ -452,18 +459,19 @@ def rigidClusterLength(rigFile,parFile,numParticles,Lx,Ly,snapShotRange=False,ro
         #x distances 
         pos_1d = pos[:, 0][:, np.newaxis] # shape (N, 1)
         dist_1dx = pdist(pos_1d)  # shape (N * (N - 1) // 2, )
-        dist_1dx[dist_1dx > Lx * 0.5] -= Lx
+        dist_1dx[dist_1dx > Lx/2] -= Lx
         
         #y distances next
         pos_1d = pos[:, 1][:, np.newaxis]  # shape (N, 1)
         dist_1dy = pdist(pos_1d)  # shape (N * (N - 1) // 2, )
-        dist_1dy[dist_1dy > Ly * 0.5] -= Ly
+        dist_1dy[dist_1dy > Ly/2] -= Ly
         
         
         largestExtentX = np.max(dist_1dx)
         largestExtentY = np.max(dist_1dy)
+        largestTotalExtent = np.max(np.sqrt(dist_1dx**2+dist_1dy**2))
         
-        return largestExtentX,largestExtentY
+        return largestExtentX,largestExtentY,largestTotalExtent
     
     
     #Read in rigid cluster information
@@ -494,33 +502,48 @@ def rigidClusterLength(rigFile,parFile,numParticles,Lx,Ly,snapShotRange=False,ro
     positionData = positionData[:,:,lowerSnapShotRange:upperSnapShotRange]
     
     
-    xExtentHolder = (upperSnapShotRange-lowerSnapShotRange)*[[]]
-    yExtentHolder = (upperSnapShotRange-lowerSnapShotRange)*[[]]
-    
+    xExtentHolder = (len(clusterIDs))*[[]]
+    yExtentHolder = (len(clusterIDs))*[[]]
+    totalExtentHolder = (len(clusterIDs))*[[]]
 
-    for i in range(0,upperSnapShotRange-lowerSnapShotRange):
-        
+    for i in range(0,len(clusterIDs)):
+        print(i)
         currentPos = positionData[:,:,i]
         currentClusterIDs = clusterIDs[i]
         
-        clusterExtentHolderX = []
-        clusterExtentHolderY = []
-        
+        checker=0
         for clusters in currentClusterIDs:
+            checker = np.sum(clusters)
+        
+        
+        
+        if checker!=0:
+            clusterExtentHolderX = []
+            clusterExtentHolderY = []
+            clusterExtentHolderTotal=[]
             
-            allIDsInCurrentCluster = np.unique(clusters)
-            allIDsInCurrentCluster = [int(ids) for ids in allIDsInCurrentCluster]
-            positionsOfParticlesInCurrentCluster = currentPos[allIDsInCurrentCluster,:]
+            for clusters in currentClusterIDs:
+    
+                allIDsInCurrentCluster = np.unique(clusters)
+                allIDsInCurrentCluster = [int(ids) for ids in allIDsInCurrentCluster]
+                positionsOfParticlesInCurrentCluster = currentPos[allIDsInCurrentCluster,:]
+                
+                (largestExtentX,largestExtentY,totalExtent) = snapShotLengthCalc(positionsOfParticlesInCurrentCluster,Lx,Ly)
+                
+                clusterExtentHolderX.append(largestExtentX)
+                clusterExtentHolderY.append(largestExtentY)
+                clusterExtentHolderTotal.append(totalExtent)
+    
+                
+            xExtentHolder[i] = np.max(clusterExtentHolderX)
+            yExtentHolder[i] = np.max(clusterExtentHolderY)
+            totalExtentHolder[i] = np.max(clusterExtentHolderY)
+        else:
+            xExtentHolder[i] = 0
+            yExtentHolder[i] = 0
+            totalExtentHolder[i] = 0
             
-            (largestExtentX,largestExtentY) = snapShotLengthCalc(positionsOfParticlesInCurrentCluster,Lx,Ly)
-            
-            clusterExtentHolderX.append(largestExtentX)
-            clusterExtentHolderY.append(largestExtentY)
-            
-        xExtentHolder[i] = clusterExtentHolderX
-        yExtentHolder[i] = clusterExtentHolderY
-            
-    return (xExtentHolder,yExtentHolder)
+    return (xExtentHolder,yExtentHolder,totalExtentHolder)
         
 def largestClusterCalc(rigFile,snapShotStartingPoint,maximum=True):
     
@@ -654,6 +677,8 @@ def intFileStrainReader(intFile):
             strainList.append(floats_list[2])
             
     return np.array(strainList)
+
+
 
             
         

@@ -202,7 +202,7 @@ def rigidClusterPlotGenerator(fileName,snapShot,parFile,intFile,rigFile,rigidClu
     #Loop through all the clusters and plot them on the previous SVG object
     for clusters in clusterIDs[0]:
         if len(clusters)==1:
-            print("fuck")
+            print("okay")
         else:
             numContactsInCluster = np.shape(clusters)[0]
             
@@ -531,13 +531,132 @@ def rigidClusterSizeDist2D(rigFileList,snapShotRange,nBins,sMax=True):
     matplotlib.pyplot.yscale("log")
     matplotlib.pyplot.xscale("log")
 
+def coulombThresholdPlotter(positions,radii,belowCoulomb,aboveCoulomb,systemSizeLx,systemSizeLz,outputFile=False,forceColor=("orange","black"),threshold=5,strokeWidth=0.5):
+    
 
-
-
-
+    svgFile = svgwrite.Drawing(size=(systemSizeLx+systemSizeLx/10, systemSizeLz+systemSizeLz/10))
     
     
+    belowColor = forceColor[0]
+    aboveColor = forceColor[1]
+        
     
+    xPos = positions[:,0] + 11*systemSizeLx/20
+    yPos = positions[:,1] + 11*systemSizeLz/20
+
+    #First plot all the circles
+    #breakpoint()
+    for i in range(0,len(radii)):
+        svgFile.add(svgwrite.shapes.Circle(center=(xPos[i], yPos[i]), r=radii[i],stroke='black',stroke_width=.1,fill="none",))
+            
+    #Next plot all the frictional forces in red and the hydrodynamic forces in blue
+    
+    (numRows,_) =  np.shape(aboveCoulomb)
+    
+    for i in range(0,numRows):
+        firstParticleIndex = aboveCoulomb[i,0]
+        secondParticleIndex = aboveCoulomb[i,1] 
+
+        xPos1 = xPos[int(firstParticleIndex)]
+        yPos1 = yPos[int(firstParticleIndex)]
+        
+        xPos2 = xPos[int(secondParticleIndex)]
+        yPos2 = yPos[int(secondParticleIndex)]
+        
+
+        
+        if ((xPos1-xPos2)**2 + (yPos1-yPos2)**2 < systemSizeLx/threshold):
+            svgFile.add(svgwrite.shapes.Line(start=(xPos1, yPos1), end=(xPos2, yPos2),stroke_width=strokeWidth,stroke=aboveColor,))
+            
+            
+    (numRows,_) =  np.shape(belowCoulomb)
+    
+    for i in range(0,numRows):
+        firstParticleIndex = belowCoulomb[i,0]
+        secondParticleIndex = belowCoulomb[i,1] 
+
+        xPos1 = xPos[int(firstParticleIndex)]
+        yPos1 = yPos[int(firstParticleIndex)]
+        
+        xPos2 = xPos[int(secondParticleIndex)]
+        yPos2 = yPos[int(secondParticleIndex)]
+        
+
+        
+        if ((xPos1-xPos2)**2 + (yPos1-yPos2)**2 < systemSizeLx/threshold):
+            svgFile.add(svgwrite.shapes.Line(start=(xPos1, yPos1), end=(xPos2, yPos2),stroke_width=strokeWidth,stroke=belowColor,))
+                
+    if outputFile==False:
+        return svgFile
+    else:
+        svgFile.saveas(outputFile)  
+        return svgFile
+    
+def coulombThreshHoldChecker(parFile,intFile,snapShotRange=False):
+    
+    
+    with open(intFile) as fp:
+        for i, line in enumerate(fp):
+            if i==1:
+                res = [int(i) for i in line.split() if i.isdigit()]
+                numParticles=res[0] #This skips the first five characters in the line since they're always "# np "
+            if i==3:
+                systemSizeLx = float(line[5:]) #This skips the first five characters in the line since they're always "# Lx "
+            if i==5:
+                systemSizeLz = float(line[5:]) #This skips the first five characters in the line since they're always "# Lx "
+    
+    #Load in the particles radii's (second column), the x positions (third column), and z positions (fifth column).
+    positionData = np.loadtxt(parFile,usecols=[1,2,4])
+
+    #Extract number of snapshots from positionData
+    numSnapshots = int(np.shape(positionData)[0]/numParticles)
+
+
+    #If the optional variable snapShotRange is not set then process all snapshots.  Otherwise set the correct range.
+    if snapShotRange == False:
+        lowerSnapShotRange = 0
+        upperSnapShotRange = numSnapshots
+    else:
+        if snapShotRange[1]==-1:
+            lowerSnapShotRange = snapShotRange[0]
+            upperSnapShotRange = numSnapshots
+        else:
+            lowerSnapShotRange = snapShotRange[0]
+            upperSnapShotRange = snapShotRange[1]
+    
+ 
+    #Now lets load in the particle contacts from intFile and ignore the header lines (first 25 lines).
+    with open(intFile) as f1:
+        fileLines = f1.readlines()[24:]
+
+    numLines = np.shape(fileLines)[0]
+
+    #We'll first find every line in intFile that starts with "#" as that is a line where a new snapshop starts.
+    counter=0
+    linesWhereDataStarts=np.array([])
+    for lines in fileLines:
+        if (np.shape(np.fromstring(lines,sep=' '))[0]==0) & ("#" in str(lines)):
+            linesWhereDataStarts = np.append(linesWhereDataStarts, counter)
+        counter=counter+1   
+
+    #Now lets make a python list to store all the different contacts for each snapshot
+    threshold = [0] * (upperSnapShotRange-lowerSnapShotRange)
+    
+    #Now we'll loop through each snapshot and store only the first three columns.  This should hopefully make this less expensive.
+    #The first column is the first particle index, the second is the second particle index and the final column tells us the contact type.
+    #We will also be ignoring any interaction where the contact type is 0 as that is a hydrodynamic interaction.
+    counter = 0
+    for i in range(lowerSnapShotRange,upperSnapShotRange):
+        if i==numSnapshots-1:
+            threshold = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(numLines)),usecols=(0,1,2))
+        else:
+            threshold = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(linesWhereDataStarts[i + 1])),usecols=(0,1,2))
+        
+    
+
+    
+    return threshold,systemSizeLx,systemSizeLz
+ 
     
     
     
