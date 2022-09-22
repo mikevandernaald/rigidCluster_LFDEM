@@ -140,6 +140,9 @@ def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False,returnPebbleIDa
     else:
         lowerSnapShotRange = snapShotRange[0]
         upperSnapShotRange = snapShotRange[1]
+        if upperSnapShotRange == -1:
+            upperSnapShotRange=numSnapshots
+
 
 
     #Extract the particle radii's
@@ -275,6 +278,7 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressC
             if stressRange[0] <= float(currentStress) <= stressRange[1]:
                 print("We're currently processing the stress: " + currentStress )
             else:
+                print("We're currently skipping the stress: " + currentStress )
                 break
             
         
