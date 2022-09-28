@@ -46,7 +46,7 @@ The third function "rigFileReader" reads in a particular rigFile given the path 
 rig file with the default being all snap shots.  Finally readInIDs sets whether or not the function will try to read in the particle IDs from the rig file which 
 increases the runtime quite a bit.
 
-The remaining functions are just helper functions that I (mike van der Naald) cobbled together to analyze and process rig_ files or other LF_DEM data.  If one 
+The remaining functions are just helper functions that I (Mike van der Naald) cobbled together to analyze and process rig_ files or other LF_DEM data.  If one 
 looks interesting to you go ahead and email me (mikevandernaald@gmail.com) and I can try to add some comments to it.
 
 To run on the cluster just use the following code to point the Python interpreter to where you keep this code:
@@ -251,6 +251,7 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressC
     
     parFiles = []
     intFiles = []
+    rigFiles = []
     
 
     for file in os.listdir(topDir):
@@ -258,7 +259,29 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressC
             intFiles.append(file)
         if "par_" in file:
             parFiles.append(file)
-            
+        if "rig_" in file:
+            rigFiles.append(file)
+    
+    parFilesStresses = []
+    intFilesStresses = []
+    rigFileStresses = []
+    #Find the stresses for each
+    for file in parFiles:
+        result = re.search('_stress(.*)cl', file)
+        parFilesStresses.append(float(result.group(1)))
+                                
+    for file in intFiles:
+        result = re.search('_stress(.*)cl', file)
+        intFilesStresses.append(float(result.group(1)))
+                                
+                                
+    for file in rigFiles:
+        result = re.search('_stress(.*)cl', file)
+        rigFileStresses.append(float(result.group(1)))
+
+    
+    
+    
             
     for currentFile in parFiles:
         if stressControlled==True:
@@ -279,7 +302,10 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressC
                 print("We're currently processing the stress: " + currentStress )
             else:
                 print("We're currently skipping the stress: " + currentStress )
-                break
+                continue
+        if float(currentStress) in rigFileStresses:
+            print("We're currently skipping the stress: " + currentStress + " rig_ file already exists!")
+            continue
             
         
         currentClusterInfo = pebbleGame_LFDEMSnapshot(currentParFile,currentIntFile,snapShotRange)
