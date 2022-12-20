@@ -1,8 +1,20 @@
 # -*- coding: utf-8 -*-
 """
 Created on Fri Sep 16 09:45:34 2022
+@author: Mike van der Naald
 
-@author: mikev
+This code is based on Silke Henke's code called "Hessian.py" found in the following Github repository:
+    
+    
+    
+That code takes experimental data and also frictional packing simulations as inputs
+and generates their frictional Hessian, more information can be found in the following publication:
+    
+    
+
+This code takes in LF_DEM simulation data as inputs and generates their frictional Hessian.
+
+
 """
 import numpy as np
 import sys
@@ -19,32 +31,35 @@ from os import listdir
 from os.path import isfile, join
 
 
-def hessianDataExtractor(intFile,parFile,inputFile,numParticles,snapShotRange=False):
-    
-    #let's first get the spring constants from the input files
-    fp = open(inputFile)
-    for i, line in enumerate(fp):
-        if "kn =" in line:
-            kn = line
-        elif "kt =" in line:
-            kt = line
-            break
-    fp.close()
-    
-    result = re.search('kt = (.*)cl;', kt)
-    kt = float(result.group(1))
-    
-    result = re.search('kn = (.*)cl;', kn)
-    kn = float(result.group(1))
 
-    
-    radii = np.loadtxt(parFile,usecols=[1])
-    #Extract number of snapshots from radiiData before discarding most of it
-    numSnapshots = int(np.shape(radii)[0]/numParticles)
+parFile = r"D:\data\rigidClusterData\dataFromCluster\mu_0.1\VF0.79\par_D2N2000VF0.79Bidi1.4_0.5Square_1_pardata_phi0.79_stress10cl.dat"
+intFile = r"D:\data\rigidClusterData\dataFromCluster\mu_0.1\VF0.79\int_D2N2000VF0.79Bidi1.4_0.5Square_1_pardata_phi0.79_stress10cl.dat"
+dataFile = r"D:\data\rigidClusterData\dataFromCluster\mu_0.1\VF0.79\data_D2N2000VF0.79Bidi1.4_0.5Square_1_pardata_phi0.79_stress10cl.dat"
+numParticles = 2000
+snapShotRange=[0,-1]
 
-    radii = radii[:numParticles]
 
+def hessianDataExtractor(intFile,parFile,dataFile,numParticles,snapShotRange=False):
+    """
+    This function extracts the needed data for the Hessian which is constructed in a subsequent function.
+    In order to calculate the frictional hessian we need the IDs of each particle in contact, the two spring
+    constants associated with the contact, their interparticle separation, the normal vector, the tangent vector,
+    and the particle radii's.
     
+    1.  Particle radii are retrieved from the parFile.
+    
+    2.  We'll first get the spring constants for each strain step from the dataFile.
+    
+    3.  We'll get the list of particle contacts, their IDs, interparticle separation, and .
+    
+    """
+    
+    #1.  Let's get the particle radii and the number of snapshots in the parFile.
+    positionData = np.loadtxt(parFile,usecols=[1,2,4])
+    numSnapshots = int(np.shape(positionData)[0]/numParticles)
+    radii = positionData[:numParticles,0]
+    
+    del positionData
     
     if snapShotRange == False:
         lowerSnapShotRange = 0
@@ -52,8 +67,22 @@ def hessianDataExtractor(intFile,parFile,inputFile,numParticles,snapShotRange=Fa
     else:
         lowerSnapShotRange = snapShotRange[0]
         upperSnapShotRange = snapShotRange[1]
+        if upperSnapShotRange == -1:
+            upperSnapShotRange=numSnapshots
     
-    #Let's first extract the contact information by opening up the int file.
+    #2.  Let's get the spring constants from the data file
+    with open(dataFile) as f1:
+        fileLines = f1.readlines()[45:]
+    
+    #We're only extracting the strain step, k_n, and k_t from the data files
+    springConstants = np.zeros((len(fileLines),3))
+    counter=0
+    for lines in fileLines:
+        currentLine = np.fromstring(str(lines.replace("n","0")),dtype=np.double, sep=' ')
+        springConstants[counter,:] = np.array([currentLine[1],currentLine[31],currentLine[32]])
+        counter=counter+1
+        
+    #3.  Let's extract which particles are in contact, their separations, and from the intFile.
     #Ignore the header lines (first 25 lines).
     with open(intFile) as f1:
         fileLines = f1.readlines()[24:]
@@ -62,13 +91,18 @@ def hessianDataExtractor(intFile,parFile,inputFile,numParticles,snapShotRange=Fa
 
     #We'll first find every line in intFile that starts with "#" as that is a line where a new snapshop starts.
     counter=0
+    otherCounter=0
+    strainInfo = np.zeros(upperSnapShotRange-lowerSnapShotRange)
     linesWhereDataStarts=np.array([])
     for lines in fileLines:
         if (np.shape(np.fromstring(lines,sep=' '))[0]==0) & ("#" in str(lines)):
+            strainInfo[otherCounter] = np.fromstring(lines.replace("#",""),sep=' ')[0]
             linesWhereDataStarts = np.append(linesWhereDataStarts, counter)
+            otherCounter = otherCounter +1
+            
         counter=counter+1
-
-
+        
+        
     #Now lets make a python list to store all the different contacts for each snapshot
     contactInfo = [0] * (upperSnapShotRange-lowerSnapShotRange)
 
@@ -82,38 +116,161 @@ def hessianDataExtractor(intFile,parFile,inputFile,numParticles,snapShotRange=Fa
             currentContacts = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(numLines)),usecols=(0,1,2,3,5,6))
             currentContacts = currentContacts[np.where(currentContacts[:, 2] > 1), :][0]
             if len(currentContacts)==0:
-                contactInfo[counter] = np.array([[0],[0]])
+                contactInfo[counter] = [0]
             else:    
-                contactInfo[counter] = np.concatenate((np.expand_dims(currentContacts[:,0], axis=1),np.expand_dims(currentContacts[:,1], axis=1),np.expand_dims(currentContacts[:,2], axis=1)),axis=1)
+                contactInfo[counter] = currentContacts
             
         else:
             currentContacts = np.genfromtxt(itertools.islice(fileLines, int(linesWhereDataStarts[i]), int(linesWhereDataStarts[i + 1])),usecols=(0,1,2,3,5,6))
             currentContacts = currentContacts[np.where(currentContacts[:, 2] > 1), :][0]
             if len(currentContacts)==0:
-                contactInfo[counter] = np.array([[0],[0]])
+                contactInfo[counter] = [0]
             else:    
-                contactInfo[counter] = np.concatenate((np.expand_dims(currentContacts[:,0], axis=1),np.expand_dims(currentContacts[:,1], axis=1),np.expand_dims(currentContacts[:,2], axis=1)),axis=1)
-        del currentContacts
+                contactInfo[counter] = currentContacts
         counter=counter+1
 
-    #We no longer need fileLines and it takes up a lot of RAM so we can delete it (not sure if this is needed, python interpreters are pretty good about this stuff)
-    del fileLines
+
+    #Before reporting returning the data we have too many spring constants as the data_ files contain ~10X more data than the int_ files.
+    springConstantsNew = np.zeros((numSnapshots,3))
+    counter=0
+    for s in springConstants:
+        if s[0] in strainInfo:
+            springConstantsNew[counter,:] = s
+            counter=counter+1
+            
+            
+    
+    
+    return radii, springConstantsNew, contactInfo
+    
+    
+    
+    
 
 
-    return contactInfo,radii
+dimGap  = contactInfo[6][4,6]
+partI = int(contactInfo[6][4,0])
+partJ = int(contactInfo[6][4,1])
+
+posI = positionData[partI,:,6]
+posJ = positionData[partJ,:,6]
 
 
-def 2DHessianGenerator(contactInformation,positions,radii,K_t,K_n,particleDensity=1,cylinderHeight=1):
+Ri = radii[partI]
+Rj = radii[partJ]
+
+distance = np.sqrt(np.sum((posI-posJ)**2))
+
+#s-2, s = 2r/(a1+a2)
+
+s = dimGap+2
+
+r = (s/2)*(Ri+Rj) #THIS IS THE TRUE DIM GAP
+
+
+
+
+radii, springConstantsNew, currentContacts = hessianDataExtractor(intFile,parFile,dataFile,numParticles,snapShotRange)
+
+
+def 2DHessianGenerator(radii,springConstants,contactInfo,particleDensity=1,cylinderHeight=1):
     """
-    contactInformation has a row for each contact with the first column being the 
-    ID of the first particle, the second column being the ID of the second
-    particle, the third column being the n_x component of the normal force, 
-    the fourth column being the n_y component of the normal force, 
-    the fifth column determines whether the contacat is sliding or not, finally the
-    last column is the overlap between two particles
+    This function generates a 2D frictional Hessian using the formulation and some original code from the following publication:
+        
+        
+        
+    The three input variables are:
+        1.  The radii, this is a numpy array that has an entry for each particle and denotes what their radii is.
+        2.  springConstants is a numpy array that has a row for each simulation snap shot.  The first column is the 
+        strain step of the snap shot, the second column is the normal spring constant coeff, and the third column is the
+        tangential spring constant coeff.
+        3.  contactInfo is a list with each entry corresponding to a numpy array for each simulation snapshot.  Each numpy array
+        has a row for each frictional contact, the first column is the ID of the particle i, the second column is the ID of particle j.
+        The third and fourth columns are the x and z components of the normal vector (y is zero in 2D).  Finally the fifth entry is the 
+        dimensionless gap which we'll convert into the center to center distance.
     """
     numParticles = len(radii)
-    Hessian = np.zeros((3 * numParticles, 3 * numParticles))
+    numSnapshots = len(contactInfo)
+    
+    
+    hessianHolder = np.zeros((3 * numParticles, 3 * numParticles,numSnapshots))
+    
+    
+    counter=0
+    for currentSnapShot in contactInfo:
+        #Let's get the spring constants for this snapshot
+        kn = springConstants[counter,1]
+        k_t = springConstants[counter,2] 
+        counter=counter+1
+        
+        
+        #Now let's loop through every contact and construct that portion of the Hessian.
+        for contact in currentSnapShot:
+            
+            i = int(contact[0])
+            j = int(contact[1])
+            slidingOrNot = int(contact[2])
+            nx0 = contact[3]
+            ny0 = contact[4]
+            dimGap = contact[5]
+            
+            tx0 = -ny0
+            ty0 = nx0
+                
+            R_i = radii[i]
+            R_j = radii[j]
+            particleOverlap = (1/2)*(dimGap+2)*(R_i+R_j)
+            
+            Ai = 1.0 / 2**0.5
+            Aj = 1.0 / 2**0.5
+            
+            mi = particleDensity * cylinderHeight * np.pi * R_i**2
+            mj = particleDensity * cylinderHeight * np.pi * R_j**2
+            
+            fn = kn * (R_i + R_j - particleOverlap)
+            
+            if slidingOrNot==2:
+                kt = k_t
+            else:
+                kt = 0
+            
+            
+            
+            subsquare = np.zeros((3, 3))
+            subsquare[0, 0] = -kn
+            subsquare[1, 1] = fn / particleOverlap - kt
+            subsquare[1, 2] = kt * Aj
+            # note asymmetric cross-term
+            subsquare[2, 1] = -kt * Ai
+            subsquare[2, 2] = kt * Ai * Aj
+            #collect our little forces
+            favx += fn * nx0 + self.conf.ftan[k] * tx0
+            favy += fn * ny0 + self.conf.ftan[k] * ty0
+            frotav += self.conf.rad[i] * self.conf.ftan[k]
+
+            # Stick this into the appropriate places after rotating it away from the (n,t) frame
+            Hij = np.zeros((3, 3))
+            Hij[0, 0] = subsquare[0, 0] * nx0**2 + subsquare[1, 1] * tx0**2
+            Hij[0,
+                1] = subsquare[0, 0] * nx0 * ny0 + subsquare[1, 1] * tx0 * ty0
+            Hij[1,
+                0] = subsquare[0, 0] * ny0 * nx0 + subsquare[1, 1] * ty0 * tx0
+            Hij[1, 1] = subsquare[0, 0] * ny0**2 + subsquare[1, 1] * ty0**2
+            Hij[0, 2] = subsquare[1, 2] * tx0
+            Hij[1, 2] = subsquare[1, 2] * ty0
+            Hij[2, 0] = subsquare[2, 1] * tx0
+            Hij[2, 1] = subsquare[2, 1] * ty0
+            Hij[2, 2] = subsquare[2, 2]
+
+            # And put it into the Hessian, with correct elasticity prefactor
+            # once for contact ij
+            hessianHolder[3 * i:(3 * i + 3),
+                         3 * j:(3 * j + 3),counter] = Hij / (mi * mj)**0.5
+                    
+                
+            
+            
+        
     
     
     for contacts in contactInformation:

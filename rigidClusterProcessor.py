@@ -280,8 +280,6 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressC
         rigFileStresses.append(float(result.group(1)))
 
     
-    
-    
             
     for currentFile in parFiles:
         if stressControlled==True:
@@ -537,7 +535,6 @@ def rigidClusterLength(rigFile,parFile,numParticles,Lx,Ly,snapShotRange=False,ro
     totalExtentHolder = (len(clusterIDs))*[[]]
 
     for i in range(0,len(clusterIDs)):
-        print(i)
         currentPos = positionData[:,:,i]
         currentClusterIDs = clusterIDs[i]
         
