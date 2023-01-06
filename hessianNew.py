@@ -26,9 +26,6 @@ import Hessian as HS
 import Analysis as AN
 import itertools
 import re
-from scipy.spatial.distance import pdist
-from os import listdir
-from os.path import isfile, join
 
 def hessianDataExtractor(intFile,parFile,dataFile,numParticles,snapShotRange=False):
     """
@@ -132,10 +129,8 @@ def hessianDataExtractor(intFile,parFile,dataFile,numParticles,snapShotRange=Fal
     
     
     return radii, springConstantsNew, contactInfo
-    
-    
-def 2DHessianGenerator(radii,springConstants,contactInfo,particleDensity=1,cylinderHeight=1):
-    
+
+def hessianGenerator(radii,springConstants,contactInfo):
     
     """
     This function generates a 2D frictional Hessian using the formulation and some original code from the following publication:
@@ -178,7 +173,7 @@ def 2DHessianGenerator(radii,springConstants,contactInfo,particleDensity=1,cylin
                 
             R_i = radii[i]
             R_j = radii[j]
-            particleOverlap = (1/2)*(dimGap+2)*(R_i+R_j)
+            rval = (1/2)*(dimGap+2)*(R_i+R_j)
             
             Ai = 1.0 / 2**0.5
             Aj = 1.0 / 2**0.5
@@ -202,7 +197,7 @@ def 2DHessianGenerator(radii,springConstants,contactInfo,particleDensity=1,cylin
             # This is our litte square in local coordinates (where nonzero)
             subsquare = np.zeros((3, 3))
             subsquare[0, 0] = -kn
-            subsquare[1, 1] = fn / (self.conf.rconversion * rval) - kt
+            subsquare[1, 1] = fn / rval - kt
             subsquare[1, 2] = kt * Aj
             # note asymmetric cross-term
             subsquare[2, 1] = -kt * Ai
@@ -254,7 +249,7 @@ def 2DHessianGenerator(radii,springConstants,contactInfo,particleDensity=1,cylin
             # Careful, the diagonal bits are not just minus because of the rotations
             diagsquare = np.zeros((3, 3))
             diagsquare[0, 0] = kn
-            diagsquare[1, 1] = -fn / (self.conf.rconversion * rval) + kt
+            diagsquare[1, 1] = -fn / rval + kt
             diagsquare[1, 2] = kt * Ai
             diagsquare[2, 1] = kt * Ai
             diagsquare[2, 2] = kt * Ai**2
@@ -282,7 +277,7 @@ def 2DHessianGenerator(radii,springConstants,contactInfo,particleDensity=1,cylin
             # and adjusted A's
             diagsquare = np.zeros((3, 3))
             diagsquare[0, 0] = kn
-            diagsquare[1, 1] = -fn / (self.conf.rconversion * rval) + kt
+            diagsquare[1, 1] = -fn / rval + kt
             diagsquare[1, 2] = kt * Aj
             diagsquare[2, 1] = kt * Aj
             diagsquare[2, 2] = kt * Aj**2
@@ -350,21 +345,18 @@ def generateHessianFiles(topDir,numParticles,snapShotRange=False):
         
         
     #Now that we have all the int and par files we can begin iterating through them to generate the hessian files
-    for i in range(0,len(intFile)):
+    for i in range(0,len(intFileHolder)):
         currentIntFile = intFileHolder[i]
         currentStress = intStressHolder[i]
         currentDataFile = dataFileHolder[int(np.where(dataStressHolder==currentStress)[0][0])]
         currentParFile = parFileHolder[int(np.where(parStressHolder==currentStress)[0][0])]
 
   
-        radii, springConstants, currentContacts = hessianDataExtractor(intFile,parFile,dataFile,numParticles,snapShotRange)
+        radii, springConstants, currentContacts = hessianDataExtractor(currentIntFile,currentParFile,currentDataFile,numParticles,snapShotRange)
 
-        hessianHolder = 2DHessianGenerator(radii,springConstants,currentContacts)
+        hessianHolder = hessianGenerator(radii,springConstants,currentContacts)
         
-        hessianFileToSave = os.path.join(topDir,"hessian_stress"+str(currentStress)+"cl.dat")
+        hessianFileToSave = os.path.join(currentIntFile.replace("int_","hessian_"))
         np.save(hessianFileToSave,hessianHolder)
             
         
-        
-        
-    
