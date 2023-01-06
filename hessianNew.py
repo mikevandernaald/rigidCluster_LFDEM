@@ -312,11 +312,11 @@ def generateHessianFiles(topDir,numParticles,snapShotRange=False):
     parFileHolder = []
     dataFileHolder = []
     for file in os.listdir(topDir):
-        if file.startswith("int_"):
+        if file.startswith("int_D"):
             intFileHolder.append(file)
-        if file.startswith("par_"):
+        if file.startswith("par_D"):
             parFileHolder.append(file)
-        if file.startswith("data_"):
+        if file.startswith("data_D"):
             dataFileHolder.append(file)
             
     intFileHolder = [os.path.join(topDir,file) for file in intFileHolder]
