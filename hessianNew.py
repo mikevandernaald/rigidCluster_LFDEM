@@ -160,7 +160,7 @@ def hessianGenerator(radii,springConstants,contactInfo,outputDir,stressValue,cyl
     #to have in RAM.  We will write it out every 100 snapshots.
     
     
-    hessianHolder = np.zeros((3 * numParticles, 3 * numParticles,100))
+    hessianHolder = np.zeros((3 * numParticles, 3 * numParticles,50))
     
     counter=0
     hessianCounter=0
@@ -173,145 +173,147 @@ def hessianGenerator(radii,springConstants,contactInfo,outputDir,stressValue,cyl
         
         #Now let's loop through every contact and construct that portion of the Hessian.
         for contact in currentSnapShot:
-            i = int(contact[0])
-            j = int(contact[1])
-            slidingOrNot = int(contact[2])
-            nx0 = contact[3]
-            ny0 = contact[4]
-            dimGap = contact[5]
-            
-            tx0 = -ny0
-            ty0 = nx0
+            if np.array_equal(currentSnapShot,np.array([0]))!=True:
                 
-            R_i = radii[i]
-            R_j = radii[j]
-            rval = (1/2)*(dimGap+2)*(R_i+R_j)
-            
-            Ai = 1.0 / 2**0.5
-            Aj = 1.0 / 2**0.5
-            
-            mi = particleDensity * cylinderHeight * np.pi * R_i**2
-            mj = particleDensity * cylinderHeight * np.pi * R_j**2
-            
-            fn = kn * (R_i + R_j - dimGap)
-            
-            if slidingOrNot==2:
-                kt = k_t
-            else:
-                kt = 0
-            
-            
-            
-            #Mike:  From here on out we're trusting Silke's original construction
-            #and just relabeling things.
-
+                i = int(contact[0])
+                j = int(contact[1])
+                slidingOrNot = int(contact[2])
+                nx0 = contact[3]
+                ny0 = contact[4]
+                dimGap = contact[5]
+                
+                tx0 = -ny0
+                ty0 = nx0
+                    
+                R_i = radii[i]
+                R_j = radii[j]
+                rval = (1/2)*(dimGap+2)*(R_i+R_j)
+                
+                Ai = 1.0 / 2**0.5
+                Aj = 1.0 / 2**0.5
+                
+                mi = particleDensity * cylinderHeight * np.pi * R_i**2
+                mj = particleDensity * cylinderHeight * np.pi * R_j**2
+                
+                fn = kn * (R_i + R_j - dimGap)
+                
+                if slidingOrNot==2:
+                    kt = k_t
+                else:
+                    kt = 0
+                
+                
+                
+                #Mike:  From here on out we're trusting Silke's original construction
+                #and just relabeling things.
     
-            # This is our litte square in local coordinates (where nonzero)
-            subsquare = np.zeros((3, 3))
-            subsquare[0, 0] = -kn
-            subsquare[1, 1] = fn / rval - kt
-            subsquare[1, 2] = kt * Aj
-            # note asymmetric cross-term
-            subsquare[2, 1] = -kt * Ai
-            subsquare[2, 2] = kt * Ai * Aj
-
-            # Stick this into the appropriate places after rotating it away from the (n,t) frame
-            Hij = np.zeros((3, 3))
-            Hij[0, 0] = subsquare[0, 0] * nx0**2 + subsquare[1, 1] * tx0**2
-            Hij[0,
-                1] = subsquare[0, 0] * nx0 * ny0 + subsquare[1, 1] * tx0 * ty0
-            Hij[1,
-                0] = subsquare[0, 0] * ny0 * nx0 + subsquare[1, 1] * ty0 * tx0
-            Hij[1, 1] = subsquare[0, 0] * ny0**2 + subsquare[1, 1] * ty0**2
-            Hij[0, 2] = subsquare[1, 2] * tx0
-            Hij[1, 2] = subsquare[1, 2] * ty0
-            Hij[2, 0] = subsquare[2, 1] * tx0
-            Hij[2, 1] = subsquare[2, 1] * ty0
-            Hij[2, 2] = subsquare[2, 2]
-
-            # And put it into the Hessian, with correct elasticity prefactor
-            # once for contact ij
-            hessianHolder[3 * i:(3 * i + 3),3 * j:(3 * j + 3),counter] = Hij / (mi * mj)**0.5
-
-            # see notes for the flip one corresponding to contact ji
-            # both n and t flip signs. Put in here explicitly. Essentially, angle cross-terms flip sign
-            # Yes, this is not fully efficient, but it's clearer. Diagonalisation is rate-limiting step, not this.
-            # careful with the A's
-            subsquare[1, 2] = subsquare[1, 2] * Ai / Aj
-            subsquare[2, 1] = subsquare[2, 1] * Aj / Ai
-            Hji = np.zeros((3, 3))
-            Hji[0,
-                0] = subsquare[0, 0] * (-nx0)**2 + subsquare[1, 1] * (-tx0)**2
-            Hji[0, 1] = subsquare[0, 0] * (-nx0) * (-ny0) + subsquare[1, 1] * (
-                -tx0) * (-ty0)
-            Hji[1, 0] = subsquare[0, 0] * (-ny0) * (-nx0) + subsquare[1, 1] * (
-                -ty0) * (-tx0)
-            Hji[1,
-                1] = subsquare[0, 0] * (-ny0)**2 + subsquare[1, 1] * (-ty0)**2
-            Hji[0, 2] = subsquare[1, 2] * (-tx0)
-            Hji[1, 2] = subsquare[1, 2] * (-ty0)
-            Hji[2, 0] = subsquare[2, 1] * (-tx0)
-            Hji[2, 1] = subsquare[2, 1] * (-ty0)
-            Hji[2, 2] = subsquare[2, 2]
-
-            # And put it into the Hessian
-            # now for contact ji
-            hessianHolder[3 * j:(3 * j + 3),3 * i:(3 * i + 3),counter] = Hji / (mi * mj)**0.5
-
-            # Careful, the diagonal bits are not just minus because of the rotations
-            diagsquare = np.zeros((3, 3))
-            diagsquare[0, 0] = kn
-            diagsquare[1, 1] = -fn / rval + kt
-            diagsquare[1, 2] = kt * Ai
-            diagsquare[2, 1] = kt * Ai
-            diagsquare[2, 2] = kt * Ai**2
-
-            # Stick this into the appropriate places:
-            Hijdiag = np.zeros((3, 3))
-            Hijdiag[0,
-                    0] = diagsquare[0, 0] * nx0**2 + diagsquare[1, 1] * tx0**2
-            Hijdiag[0, 1] = diagsquare[0, 0] * nx0 * ny0 + diagsquare[
-                1, 1] * tx0 * ty0
-            Hijdiag[1, 0] = diagsquare[0, 0] * ny0 * nx0 + diagsquare[
-                1, 1] * ty0 * tx0
-            Hijdiag[1,
-                    1] = diagsquare[0, 0] * ny0**2 + diagsquare[1, 1] * ty0**2
-            Hijdiag[0, 2] = diagsquare[1, 2] * tx0
-            Hijdiag[1, 2] = diagsquare[1, 2] * ty0
-            Hijdiag[2, 0] = diagsquare[2, 1] * tx0
-            Hijdiag[2, 1] = diagsquare[2, 1] * ty0
-            Hijdiag[2, 2] = diagsquare[2, 2]
-
-            # And then *add* it to the diagnual
-            hessianHolder[3 * i:(3 * i + 3), 3 * i:(3 * i + 3),counter] += Hijdiag / mi
-
-            #And once more for the jj contribution, which is the same whizz with the flipped sign of n and t
-            # and adjusted A's
-            diagsquare = np.zeros((3, 3))
-            diagsquare[0, 0] = kn
-            diagsquare[1, 1] = -fn / rval + kt
-            diagsquare[1, 2] = kt * Aj
-            diagsquare[2, 1] = kt * Aj
-            diagsquare[2, 2] = kt * Aj**2
-
-            Hjidiag = np.zeros((3, 3))
-            Hjidiag[0, 0] = diagsquare[0, 0] * (-nx0)**2 + diagsquare[1, 1] * (
-                -tx0)**2
-            Hjidiag[0, 1] = diagsquare[0, 0] * (-nx0) * (
-                -ny0) + diagsquare[1, 1] * (-tx0) * (-ty0)
-            Hjidiag[1, 0] = diagsquare[0, 0] * (-ny0) * (
-                -nx0) + diagsquare[1, 1] * (-ty0) * (-tx0)
-            Hjidiag[1, 1] = diagsquare[0, 0] * (-ny0)**2 + diagsquare[1, 1] * (
-                -ty0)**2
-            Hjidiag[0, 2] = diagsquare[1, 2] * (-tx0)
-            Hjidiag[1, 2] = diagsquare[1, 2] * (-ty0)
-            Hjidiag[2, 0] = diagsquare[2, 1] * (-tx0)
-            Hjidiag[2, 1] = diagsquare[2, 1] * (-ty0)
-            Hjidiag[2, 2] = diagsquare[2, 2]
-
-            # And then *add* it to the diagnual
-            hessianHolder[3 * j:(3 * j + 3), 3 * j:(3 * j + 3),counter] += Hjidiag / mj
+        
+                # This is our litte square in local coordinates (where nonzero)
+                subsquare = np.zeros((3, 3))
+                subsquare[0, 0] = -kn
+                subsquare[1, 1] = fn / rval - kt
+                subsquare[1, 2] = kt * Aj
+                # note asymmetric cross-term
+                subsquare[2, 1] = -kt * Ai
+                subsquare[2, 2] = kt * Ai * Aj
     
+                # Stick this into the appropriate places after rotating it away from the (n,t) frame
+                Hij = np.zeros((3, 3))
+                Hij[0, 0] = subsquare[0, 0] * nx0**2 + subsquare[1, 1] * tx0**2
+                Hij[0,
+                    1] = subsquare[0, 0] * nx0 * ny0 + subsquare[1, 1] * tx0 * ty0
+                Hij[1,
+                    0] = subsquare[0, 0] * ny0 * nx0 + subsquare[1, 1] * ty0 * tx0
+                Hij[1, 1] = subsquare[0, 0] * ny0**2 + subsquare[1, 1] * ty0**2
+                Hij[0, 2] = subsquare[1, 2] * tx0
+                Hij[1, 2] = subsquare[1, 2] * ty0
+                Hij[2, 0] = subsquare[2, 1] * tx0
+                Hij[2, 1] = subsquare[2, 1] * ty0
+                Hij[2, 2] = subsquare[2, 2]
+    
+                # And put it into the Hessian, with correct elasticity prefactor
+                # once for contact ij
+                hessianHolder[3 * i:(3 * i + 3),3 * j:(3 * j + 3),counter] = Hij / (mi * mj)**0.5
+    
+                # see notes for the flip one corresponding to contact ji
+                # both n and t flip signs. Put in here explicitly. Essentially, angle cross-terms flip sign
+                # Yes, this is not fully efficient, but it's clearer. Diagonalisation is rate-limiting step, not this.
+                # careful with the A's
+                subsquare[1, 2] = subsquare[1, 2] * Ai / Aj
+                subsquare[2, 1] = subsquare[2, 1] * Aj / Ai
+                Hji = np.zeros((3, 3))
+                Hji[0,
+                    0] = subsquare[0, 0] * (-nx0)**2 + subsquare[1, 1] * (-tx0)**2
+                Hji[0, 1] = subsquare[0, 0] * (-nx0) * (-ny0) + subsquare[1, 1] * (
+                    -tx0) * (-ty0)
+                Hji[1, 0] = subsquare[0, 0] * (-ny0) * (-nx0) + subsquare[1, 1] * (
+                    -ty0) * (-tx0)
+                Hji[1,
+                    1] = subsquare[0, 0] * (-ny0)**2 + subsquare[1, 1] * (-ty0)**2
+                Hji[0, 2] = subsquare[1, 2] * (-tx0)
+                Hji[1, 2] = subsquare[1, 2] * (-ty0)
+                Hji[2, 0] = subsquare[2, 1] * (-tx0)
+                Hji[2, 1] = subsquare[2, 1] * (-ty0)
+                Hji[2, 2] = subsquare[2, 2]
+    
+                # And put it into the Hessian
+                # now for contact ji
+                hessianHolder[3 * j:(3 * j + 3),3 * i:(3 * i + 3),counter] = Hji / (mi * mj)**0.5
+    
+                # Careful, the diagonal bits are not just minus because of the rotations
+                diagsquare = np.zeros((3, 3))
+                diagsquare[0, 0] = kn
+                diagsquare[1, 1] = -fn / rval + kt
+                diagsquare[1, 2] = kt * Ai
+                diagsquare[2, 1] = kt * Ai
+                diagsquare[2, 2] = kt * Ai**2
+    
+                # Stick this into the appropriate places:
+                Hijdiag = np.zeros((3, 3))
+                Hijdiag[0,
+                        0] = diagsquare[0, 0] * nx0**2 + diagsquare[1, 1] * tx0**2
+                Hijdiag[0, 1] = diagsquare[0, 0] * nx0 * ny0 + diagsquare[
+                    1, 1] * tx0 * ty0
+                Hijdiag[1, 0] = diagsquare[0, 0] * ny0 * nx0 + diagsquare[
+                    1, 1] * ty0 * tx0
+                Hijdiag[1,
+                        1] = diagsquare[0, 0] * ny0**2 + diagsquare[1, 1] * ty0**2
+                Hijdiag[0, 2] = diagsquare[1, 2] * tx0
+                Hijdiag[1, 2] = diagsquare[1, 2] * ty0
+                Hijdiag[2, 0] = diagsquare[2, 1] * tx0
+                Hijdiag[2, 1] = diagsquare[2, 1] * ty0
+                Hijdiag[2, 2] = diagsquare[2, 2]
+    
+                # And then *add* it to the diagnual
+                hessianHolder[3 * i:(3 * i + 3), 3 * i:(3 * i + 3),counter] += Hijdiag / mi
+    
+                #And once more for the jj contribution, which is the same whizz with the flipped sign of n and t
+                # and adjusted A's
+                diagsquare = np.zeros((3, 3))
+                diagsquare[0, 0] = kn
+                diagsquare[1, 1] = -fn / rval + kt
+                diagsquare[1, 2] = kt * Aj
+                diagsquare[2, 1] = kt * Aj
+                diagsquare[2, 2] = kt * Aj**2
+    
+                Hjidiag = np.zeros((3, 3))
+                Hjidiag[0, 0] = diagsquare[0, 0] * (-nx0)**2 + diagsquare[1, 1] * (
+                    -tx0)**2
+                Hjidiag[0, 1] = diagsquare[0, 0] * (-nx0) * (
+                    -ny0) + diagsquare[1, 1] * (-tx0) * (-ty0)
+                Hjidiag[1, 0] = diagsquare[0, 0] * (-ny0) * (
+                    -nx0) + diagsquare[1, 1] * (-ty0) * (-tx0)
+                Hjidiag[1, 1] = diagsquare[0, 0] * (-ny0)**2 + diagsquare[1, 1] * (
+                    -ty0)**2
+                Hjidiag[0, 2] = diagsquare[1, 2] * (-tx0)
+                Hjidiag[1, 2] = diagsquare[1, 2] * (-ty0)
+                Hjidiag[2, 0] = diagsquare[2, 1] * (-tx0)
+                Hjidiag[2, 1] = diagsquare[2, 1] * (-ty0)
+                Hjidiag[2, 2] = diagsquare[2, 2]
+    
+                # And then *add* it to the diagnual
+                hessianHolder[3 * j:(3 * j + 3), 3 * j:(3 * j + 3),counter] += Hjidiag / mj
+        
         counter=counter+1
         springConstantCounter = springConstantCounter+1
         if counter == 99:
