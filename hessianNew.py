@@ -133,7 +133,7 @@ def hessianDataExtractor(intFile,parFile,dataFile,numParticles,snapShotRange=Fal
     
     return radii, springConstantsNew, contactInfo
 
-def hessianGenerator(radii,springConstants,contactInfo,outputDir,stressValue,cylinderHeight=1,particleDensity=1):
+def hessianGenerator(radii,springConstants,contactInfo,outputDir,stressValue,cylinderHeight=1,particleDensity=1,snapShotsPerBatch=50):
     
     """
     This function generates a 2D frictional Hessian using the formulation and some original code from the following publication:
@@ -160,7 +160,7 @@ def hessianGenerator(radii,springConstants,contactInfo,outputDir,stressValue,cyl
     #to have in RAM.  We will write it out every 100 snapshots.
     
     
-    hessianHolder = np.zeros((3 * numParticles, 3 * numParticles,50))
+    hessianHolder = np.zeros((3 * numParticles, 3 * numParticles,snapShotsPerBatch))
     
     counter=0
     hessianCounter=0
@@ -316,7 +316,7 @@ def hessianGenerator(radii,springConstants,contactInfo,outputDir,stressValue,cyl
         
         counter=counter+1
         springConstantCounter = springConstantCounter+1
-        if counter == 99:
+        if counter == snapShotsPerBatch-1:
             #The hessian holder is now full and we need to write it to disk and 
             #start a new hessian holder for the rest of the snapshots
             np.save(os.path.join(outputDir,str(stressValue)+"_cl_2D_N"+str(numParticles)+"_"+str(hessianCounter)+".dat"),hessianHolder)
