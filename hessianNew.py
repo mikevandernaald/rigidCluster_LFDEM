@@ -319,7 +319,7 @@ def hessianGenerator(radii,springConstants,contactInfo,outputDir,stressValue,cyl
         if counter == snapShotsPerBatch-1:
             #The hessian holder is now full and we need to write it to disk and 
             #start a new hessian holder for the rest of the snapshots
-            np.save(os.path.join(outputDir,str(stressValue)+"_cl_2D_N"+str(numParticles)+"_"+str(hessianCounter)+".dat"),hessianHolder)
+            np.save(os.path.join(outputDir,"hessian_stress"+str(stressValue)+"cl_2D_N"+str(numParticles)+"_"+str(hessianCounter)+".dat"),hessianHolder)
             hessianCounter=hessianCounter+1
                     
             hessianHolder = np.zeros((3 * numParticles, 3 * numParticles,100))
