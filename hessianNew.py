@@ -26,6 +26,9 @@ import Hessian as HS
 import Analysis as AN
 import itertools
 import re
+from scipy.spatial.distance import pdist
+from os import listdir
+from os.path import isfile, join
 
 def hessianDataExtractor(intFile,parFile,dataFile,numParticles,snapShotRange=False):
     """
@@ -130,7 +133,7 @@ def hessianDataExtractor(intFile,parFile,dataFile,numParticles,snapShotRange=Fal
     
     return radii, springConstantsNew, contactInfo
 
-def hessianGenerator(radii,springConstants,contactInfo):
+def hessianGenerator(radii,springConstants,contactInfo,outputDir,stressValue,cylinderHeight=1,particleDensity=1):
     
     """
     This function generates a 2D frictional Hessian using the formulation and some original code from the following publication:
@@ -146,17 +149,26 @@ def hessianGenerator(radii,springConstants,contactInfo):
         has a row for each frictional contact, the first column is the ID of the particle i, the second column is the ID of particle j.
         The third and fourth columns are the x and z components of the normal vector (y is zero in 2D).  Finally the fifth entry is the 
         "dimensionless gap which we'll convert into the center to center distance.
+        4.  outputDir is the directory to output the Hessian to.
+        5.  stressValue is the value of the applied stress for this set of systems.
     """
     
     numParticles = len(radii)
-    numSnapshots = len(contactInfo)
-    hessianHolder = np.zeros((3 * numParticles, 3 * numParticles,numSnapshots))
+    
+    #The hessian holder needs to be split into multiple arrays and saved to disk multiple times.  This is because an array of size
+    #[3*numParticles, 3*numParticles, numSnapshots] will have 86400000000000 entries for numParticles=2000 and numSnapshots=400 which is too large
+    #to have in RAM.  We will write it out every 100 snapshots.
+    
+    
+    hessianHolder = np.zeros((3 * numParticles, 3 * numParticles,100))
     
     counter=0
+    hessianCounter=0
+    springConstantCounter=0
     for currentSnapShot in contactInfo:
         #Let's get the spring constants for this snapshot
-        kn = springConstants[counter,1]
-        k_t = springConstants[counter,2] 
+        kn = springConstants[springConstantCounter,1]
+        k_t = springConstants[springConstantCounter,2] 
         
         
         #Now let's loop through every contact and construct that portion of the Hessian.
@@ -181,7 +193,7 @@ def hessianGenerator(radii,springConstants,contactInfo):
             mi = particleDensity * cylinderHeight * np.pi * R_i**2
             mj = particleDensity * cylinderHeight * np.pi * R_j**2
             
-            fn = kn * (R_i + R_j - particleOverlap)
+            fn = kn * (R_i + R_j - dimGap)
             
             if slidingOrNot==2:
                 kt = k_t
@@ -301,7 +313,17 @@ def hessianGenerator(radii,springConstants,contactInfo):
             hessianHolder[3 * j:(3 * j + 3), 3 * j:(3 * j + 3),counter] += Hjidiag / mj
     
         counter=counter+1
-        return hessianHolder
+        springConstantCounter = springConstantCounter+1
+        if counter == 99:
+            #The hessian holder is now full and we need to write it to disk and 
+            #start a new hessian holder for the rest of the snapshots
+            np.save(os.path.join(outputDir,str(stressValue)+"_cl_2D_N"+str(numParticles)+"_"+str(hessianCounter)+".dat"),hessianHolder)
+            hessianCounter=hessianCounter+1
+                    
+            hessianHolder = np.zeros((3 * numParticles, 3 * numParticles,100))
+            counter=0
+        
+        
         
 def generateHessianFiles(topDir,numParticles,snapShotRange=False):
 
@@ -312,11 +334,11 @@ def generateHessianFiles(topDir,numParticles,snapShotRange=False):
     parFileHolder = []
     dataFileHolder = []
     for file in os.listdir(topDir):
-        if file.startswith("int_D"):
+        if file.startswith("int_"):
             intFileHolder.append(file)
-        if file.startswith("par_D"):
+        if file.startswith("par_"):
             parFileHolder.append(file)
-        if file.startswith("data_D"):
+        if file.startswith("data_"):
             dataFileHolder.append(file)
             
     intFileHolder = [os.path.join(topDir,file) for file in intFileHolder]
@@ -354,9 +376,9 @@ def generateHessianFiles(topDir,numParticles,snapShotRange=False):
   
         radii, springConstants, currentContacts = hessianDataExtractor(currentIntFile,currentParFile,currentDataFile,numParticles,snapShotRange)
 
-        hessianHolder = hessianGenerator(radii,springConstants,currentContacts)
+        hessianGenerator(radii,springConstants,currentContacts,topDir,currentStress)
         
-        hessianFileToSave = os.path.join(currentIntFile.replace("int_","hessian_"))
-        np.save(hessianFileToSave,hessianHolder)
-            
+
         
+        
+    
