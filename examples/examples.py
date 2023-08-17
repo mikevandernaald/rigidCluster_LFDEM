@@ -23,9 +23,9 @@ outputDir = topDir
 #snapShotRange gives the range of snapshots to process.  We set it to False if we want it to process all snapshots
 #Alternatively one could set snapShotRange = [0,5] to process the first five snapshots.
 snapShotRange = False
-#reportIDs tells the function to report ID's or not.  We'll have it report ID's.  
+#reportIDs tells the function to report not only the size of each cluster but also which particles are participating
+#in each cluster.  Setting it to True tells it to report the particle IDs of the particles in a cluster into the rig file
 reportIDS = True
-
 
 rigidClusterProcessor.rigFileGenerator(topDir,outputDir,snapShotRange,reportIDS)
 
@@ -50,33 +50,3 @@ clusterSizes, numBonds, clusterIDs = rigidClusterProcessor.rigFileReader(rigFile
 
 
 
-
-"""
-Calculating return maps
-""" 
-#Read in the rig file as above
-#rigFile is the path to the rig file you want to read in.
-rigFile = r"C:\Users\mikev\Documents\temp\rig_D2N2000VF0.8Bidi1.4_0.5Square_1_pardata_phi0.8_stress10cl.dat"
-#snapShotRange gives the range of snapshots to process.  We set it to False if we want it to process all snapshots
-#Alternatively one could set snapShotRange = [0,5] to process the first five snapshots.
-snapShotRange = False
-#reportIDs tells the function read in IDs
-readInIDS = True
-
-
-clusterSizes, numBonds, clusterIDs = rigidClusterProcessor.rigFileReader(rigFile,snapShotRange,readInIDS)
-
-
-#loop through each snapshot and find the largest cluster sizes
-
-largestClusters = np.zeros(len(clusterSizes))
-
-counter=0
-for currentClusterList in clusterSizes:
-    largestClusters[counter] = np.max(currentClusterList)
-    counter=counter+1
-
-
-#Now that we have the relevant data for the return map.  We just throw out the last element and throw out the first element then concatenate together
-
-returnMapData = np.vstack([largestClusters[:-1],largestClusters[1:]]).transpose()
