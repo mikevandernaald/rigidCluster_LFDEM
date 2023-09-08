@@ -52,7 +52,8 @@ class Pebbles:
                 elif (self.game1 == 3):
                     self.AddFrictionalBonds(conf)
             else:
-                self.addFrictionalBonds(conf)
+                self.AddFrictionalBonds(conf)
+    
             print(
                 "Modified pebble games (2nd neighbours, or single contacts, or deleted contacts). Not implemented yet, please construct new functions similar to AddFrictionalBonds(conf) to modify contact lists."
             )
