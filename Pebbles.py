@@ -52,10 +52,7 @@ class Pebbles:
                 elif (self.game1 == 3):
                     self.AddFrictionalBonds(conf)
             else:
-                print(
-                    "Atypical pebble game, stopping for now as unclear meaning. If you really must, construct a new modifier type to deal with this game and any extra / deleted contacts."
-                )
-        else:
+                addFrictionalBonds(conf)
             print(
                 "Modified pebble games (2nd neighbours, or single contacts, or deleted contacts). Not implemented yet, please construct new functions similar to AddFrictionalBonds(conf) to modify contact lists."
             )

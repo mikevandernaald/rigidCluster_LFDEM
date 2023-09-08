@@ -75,7 +75,7 @@ class Configuration:
         self.dx = np.zeros(self.N)
         self.dy = np.zeros(self.N)
         self.dalpha = np.zeros(self.N)
-        del positionData
+        
 
 
 

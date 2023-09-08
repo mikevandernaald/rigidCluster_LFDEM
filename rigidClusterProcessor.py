@@ -255,7 +255,7 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressC
     
     
     parFiles = []
-    intFiles = [
+    intFiles = []
     rigFiles = []
     
 
