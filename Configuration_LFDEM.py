@@ -63,12 +63,13 @@ class Configuration:
 
     #######========== Simulation data read-in ==================
     # snap is the label, and distSnapshot tells me how many time units they are apart (in actual time, not steps)
-    def readSimdata(self, positionData,contactData,snap, distSnapshot0=100.0):
+    def readSimdata(self,contactData,snap, distSnapshot0=100.0):
         self.distSnapshot = distSnapshot0
         self.strain = self.gammadot * (1.0 * snap) * self.distSnapshot
+        #These other variables are not needed but we'll set them to zero now
 
-        self.x = positionData[:, 1]
-        self.y = positionData[:, 0]
+        self.x = np.zeros(self.N)
+        self.y = np.zeros(self.N)
         #These other variables are not needed but we'll set them to zero now
         self.alpha = np.zeros(self.N)
         self.dx = np.zeros(self.N)

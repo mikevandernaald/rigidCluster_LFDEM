@@ -56,7 +56,7 @@ sys.path.append('/home/mrv/pebbleCode/rigidCluster_LFDEM')
 
 
 
-def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False,returnPebbleIDandObj = True):
+def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False,dimension=2,pebbleGameToPlay=(3,3),returnPebbleIDandObj = True):
     """
     This program takes in the path to the data_, int_, and par_ files from LF_DEM simulation output and then feeds them
     into a code that identifies rigid cluster statistics from each snapshot in the simulation.  These statistics are then
@@ -115,22 +115,39 @@ def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False,returnPebbleIDa
             return clusterSizes,numBondsPerCluster
     
 
-    
-    with open(intFile) as fp:
-        for i, line in enumerate(fp):
-            if i==1:
-                res = [int(i) for i in line.split() if i.isdigit()]
-                numParticles=res[0] #This skips the first five characters in the line since they're always "# np "
-            if i==3:
-                systemSizeLx = float(line[5:]) #This skips the first five characters in the line since they're always "# Lx "
-            if i==5:
-                systemSizeLz = float(line[5:]) #This skips the first five characters in the line since they're always "# Lx "
-    
+    if dimension==2:
+        with open(intFile) as fp:
+            for i, line in enumerate(fp):
+                if i==1:
+                    res = [int(i) for i in line.split() if i.isdigit()]
+                    numParticles=res[0] #This skips the first five characters in the line since they're always "# np "
+                if i==3:
+                    systemSizeLx = float(line[5:]) #This skips the first five characters in the line since they're always "# Lx "
+                if i==5:
+                    systemSizeLz = float(line[5:]) #This skips the first five characters in the line since they're always "# Lz "
+
+    if dimension == 3:
+        #Mike:  This needs to be changed.
+        with open(intFile) as fp:
+            for i, line in enumerate(fp):
+                if i == 1:
+                    res = [int(i) for i in line.split() if i.isdigit()]
+                    numParticles = res[
+                        0]  # This skips the first five characters in the line since they're always "# np "
+                if i == 3:
+                    systemSizeLx = float(
+                        line[5:])  # This skips the first five characters in the line since they're always "# Lx "
+                if i == 5:
+                    systemSizeLz = float(
+                        line[5:])  # This skips the first five characters in the line since they're always "# Lx "
+                if i==4:
+                    systemSizeLy = float(line[5:]) #This skips the first five characters in the line since they're always "# Ly "
+
     #Load in the particles radii's (second column), the x positions (third column), and z positions (fifth column).
-    positionData = np.loadtxt(parFile,usecols=[1,2,4])
+    radiiData = np.loadtxt(parFile,usecols=[1])
 
     #Extract number of snapshots from positionData
-    numSnapshots = int(np.shape(positionData)[0]/numParticles)
+    numSnapshots = int(np.shape(radiiData)[0]/numParticles)
 
 
     #If the optional variable snapShotRange is not set then process all snapshots.  Otherwise set the correct range.
@@ -146,21 +163,9 @@ def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False,returnPebbleIDa
 
 
     #Extract the particle radii's
-    particleRadii = positionData[:numParticles,0]
-    #Delete the first column now that we no longer need particle radii
-    positionData=positionData[:,1:]
-    
-    
-    # Reshape the particle positions file so that it's a 3D array where each 2D slice is a snapshot.
-    # For example positionData[:,:,i] would be a 2D array of the x and z positions for the ith snapshot
-    newPosData = np.zeros((numParticles,2,numSnapshots))
-    
-    for i in range(0,numSnapshots):
-        newPosData[:,:,i] = positionData[i*numParticles:(i+1)*numParticles,:]
+    particleRadii = radiiData[:numParticles]
 
 
-    positionData = newPosData
-    positionData = positionData[:,:,lowerSnapShotRange:upperSnapShotRange]
     #Now lets load in the particle contacts from intFile and ignore the header lines (first 25 lines).
     with open(intFile) as f1:
         fileLines = f1.readlines()[24:]
@@ -224,8 +229,8 @@ def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False,returnPebbleIDa
         if np.array_equal(currentContactData,np.array([[0],[0]])):
             clusterHolder[counter]=[0]
         else:
-            ThisConf.readSimdata(positionData[:,:,counter],currentContactData,i)
-            ThisPebble = PB.Pebbles(ThisConf, 3, 3, 'nothing', False)
+            ThisConf.readSimdata(currentContactData,i)
+            ThisPebble = PB.Pebbles(ThisConf, pebbleGameToPlay[0], pebbleGameToPlay[1], 'nothing', False)
             ThisPebble.play_game()
             ThisPebble.rigid_cluster()
             if returnPebbleIDandObj == False:
@@ -242,7 +247,7 @@ def pebbleGame_LFDEMSnapshot(parFile,intFile,snapShotRange=False,returnPebbleIDa
         counter=counter+1
     return clusterHolder
 
-def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressControlled=True,stressRange=False):
+def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressControlled=True,stressRange=False,dimension=2,pebbleGameToPlay=(3,3)):
     """
     This finds all par and int files in a directory and spits out their rigidcluster statistics
     into a rig_ file
@@ -250,7 +255,7 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressC
     
     
     parFiles = []
-    intFiles = []
+    intFiles = [
     rigFiles = []
     
 
@@ -306,13 +311,14 @@ def rigFileGenerator(topDir,outputDir,snapShotRange=False,reportIDS=True,stressC
             continue
             
         
-        currentClusterInfo = pebbleGame_LFDEMSnapshot(currentParFile,currentIntFile,snapShotRange)
+        currentClusterInfo = pebbleGame_LFDEMSnapshot(currentParFile,currentIntFile,snapShotRange, dimension , pebbleGameToPlay)
+
         
         
         result = re.search('par_(.*).dat', currentFile)
         currentFileName = result.group(1)
         
-        rigidClusterFileName = os.path.join(topDir,"rig_"+currentFileName+".dat")
+        rigidClusterFileName = os.path.join(outputDir,"rig_"+currentFileName+".dat")
         
         with open(rigidClusterFileName, 'w') as fp:
             fp.write('#Rigid Cluster Sizes \n')
